@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup">
+    <div class="popup-header">
+      <span class="popup-logo">⚡ Tab Helper</span>
+    </div>
+    <div id="stats" class="popup-stats">
+      <div class="stat"><span id="tabTotal" class="stat-num">-</span><span class="stat-label">标签</span></div>
+      <div class="stat"><span id="domainTotal" class="stat-num">-</span><span class="stat-label">域名</span></div>
+    </div>
+    <div class="popup-actions">
+      <button id="btnOpen" class="popup-btn primary">打开侧边栏</button>
+      <button id="btnQuickScan" class="popup-btn">快速扫描</button>
+    </div>
+    <div class="popup-actions">
+      <button id="btnSummarizeCurrent" class="popup-btn accent">总结当前页</button>
+    </div>
+    <div id="quickResult" class="quick-result" style="display:none"></div>
+    <div id="summaryResult" class="summary-result" style="display:none"></div>
+    <div id="backendInfo" class="backend-info"></div>
+  </div>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>
