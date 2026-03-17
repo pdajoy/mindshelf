@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Brain, Sparkles, ExternalLink, Loader2, FileEdit, MessageSquare } from 'lucide-react';
+import { Sparkles, ExternalLink, Loader2, FileEdit, MessageSquare } from 'lucide-react';
 import { api, fetchSSE } from '@/lib/api';
 import { MarkdownPreview } from '../sidepanel/components/MarkdownPreview';
 
@@ -106,7 +106,7 @@ export function App() {
   return (
     <div className="w-[320px] p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <Brain className="h-5 w-5 text-primary" />
+        <img src="/icon-32.png" className="h-5 w-5 rounded-sm" alt="" />
         <h1 className="text-sm font-semibold">MindShelf</h1>
       </div>
 

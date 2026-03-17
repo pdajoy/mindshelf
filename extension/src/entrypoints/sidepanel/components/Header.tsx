@@ -6,7 +6,7 @@ import { useSettingsStore } from '../stores/settings-store';
 import { api } from '@/lib/api';
 import type { SyncedTab } from '@/lib/types';
 import type { TabViewMode } from '../App';
-import { RefreshCw, Sparkles, Brain, Copy, Loader2, Settings, Sun, Moon, Monitor } from 'lucide-react';
+import { RefreshCw, Sparkles, Copy, Loader2, Settings, Sun, Moon, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HeaderProps {
@@ -61,7 +61,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
     <div className="border-b border-border shrink-0">
       <div className="flex items-center justify-between px-2 py-1.5 gap-1 min-w-0">
         <div className="flex items-center gap-1.5 shrink-0">
-          <Brain className="h-4 w-4 text-primary shrink-0" />
+          <img src="/icon-32.png" className="h-4 w-4 shrink-0 rounded-sm" alt="" />
           <h1 className="text-xs font-semibold">MindShelf</h1>
           <span className="text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded-full leading-none">
             {tabs.length}
