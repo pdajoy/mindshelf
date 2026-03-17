@@ -104,43 +104,40 @@ export function App() {
   };
 
   return (
-    <div className="w-[320px] p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <img src="/icon-32.png" className="h-5 w-5 rounded-sm" alt="" />
-        <h1 className="text-sm font-semibold">MindShelf</h1>
-      </div>
-
+    <div className="w-[320px] p-3 space-y-2.5">
+      {/* Stats row */}
       <div className="flex gap-2">
-        <div className="flex-1 p-2.5 rounded-lg bg-muted text-center">
-          <div className="text-lg font-semibold">{tabCount}</div>
-          <div className="text-[11px] text-muted-foreground">标签</div>
+        <div className="flex-1 p-2 rounded-lg bg-muted text-center">
+          <div className="text-base font-bold">{tabCount}</div>
+          <div className="text-[10px] text-muted-foreground">标签</div>
         </div>
-        <div className="flex-1 p-2.5 rounded-lg bg-muted text-center">
-          <div className="text-lg font-semibold">{domainCount}</div>
-          <div className="text-[11px] text-muted-foreground">域名</div>
+        <div className="flex-1 p-2 rounded-lg bg-muted text-center">
+          <div className="text-base font-bold">{domainCount}</div>
+          <div className="text-[10px] text-muted-foreground">域名</div>
         </div>
       </div>
 
+      {/* Current page actions */}
       {currentTab && (
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground truncate" title={currentTab.title}>📄 {currentTab.title}</p>
+          <p className="text-[11px] text-muted-foreground truncate" title={currentTab.title}>📄 {currentTab.title}</p>
 
           <div className="flex gap-1.5">
-            <button onClick={handleSummarize} disabled={isSummarizing} className="flex-1 flex items-center justify-center gap-1.5 h-8 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            <button onClick={handleSummarize} disabled={isSummarizing} className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
               {isSummarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
               {isSummarizing ? '生成中...' : 'AI 摘要'}
             </button>
-            <button onClick={handleSaveAsNote} className="flex-1 flex items-center justify-center gap-1.5 h-8 text-xs rounded-md bg-primary/10 text-primary hover:bg-primary/20">
-              <FileEdit className="h-3 w-3" /> 保存为笔记
+            <button onClick={handleSaveAsNote} className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] rounded-md bg-primary/10 text-primary hover:bg-primary/20">
+              <FileEdit className="h-3 w-3" /> 保存笔记
             </button>
           </div>
 
           {summary && (
             <div className="space-y-1.5">
-              <div className="p-2.5 rounded-lg bg-muted max-h-[200px] overflow-auto">
+              <div className="p-2 rounded-lg bg-muted max-h-[180px] overflow-auto">
                 <MarkdownPreview content={summary} className="text-xs" />
               </div>
-              <button onClick={handleContinueAsking} className="w-full flex items-center justify-center gap-1.5 h-7 text-xs rounded-md border border-primary/30 text-primary hover:bg-primary/10">
+              <button onClick={handleContinueAsking} className="w-full flex items-center justify-center gap-1 h-6 text-[11px] rounded-md border border-primary/30 text-primary hover:bg-primary/10">
                 <MessageSquare className="h-3 w-3" /> 继续追问
               </button>
             </div>
@@ -148,9 +145,20 @@ export function App() {
         </div>
       )}
 
-      <button onClick={() => openSidePanel()} className="w-full flex items-center justify-center gap-1.5 h-8 text-xs rounded-md border border-border hover:bg-muted">
-        <ExternalLink className="h-3 w-3" /> 打开侧边栏
-      </button>
+      {/* Quick actions */}
+      <div className="grid grid-cols-2 gap-1.5">
+        <button onClick={() => openSidePanel()} className="flex items-center justify-center gap-1 h-7 text-[11px] rounded-md border border-border hover:bg-muted">
+          <ExternalLink className="h-3 w-3" /> 打开侧边栏
+        </button>
+        <button onClick={() => {
+          chrome.storage.local.set({ mindshelf_open_panel: 'chat' }).then(() => {
+            chrome.sidePanel.open({ windowId: currentTab?.windowId! });
+            setTimeout(() => window.close(), 300);
+          });
+        }} className="flex items-center justify-center gap-1 h-7 text-[11px] rounded-md border border-border hover:bg-muted">
+          🤖 AI Agent
+        </button>
+      </div>
     </div>
   );
 }

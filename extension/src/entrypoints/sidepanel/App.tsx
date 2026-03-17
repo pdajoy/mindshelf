@@ -18,6 +18,7 @@ import type { SyncedTab, TabRecord } from '@/lib/types';
 export type TabViewMode = 'list' | 'grouped' | 'duplicates';
 
 const NOTE_TRIGGER_KEY = 'mindshelf_open_note_for_url';
+const PANEL_TRIGGER_KEY = 'mindshelf_open_panel';
 
 function Toast() {
   const toast = useNavStore(s => s.toast);
@@ -42,6 +43,13 @@ export function App() {
     const init = async () => {
       await loadFromStorage();
       loadModels();
+      try {
+        const r = await chrome.storage.local.get(PANEL_TRIGGER_KEY);
+        if (r[PANEL_TRIGGER_KEY]) {
+          setActivePanel(r[PANEL_TRIGGER_KEY] as any);
+          await chrome.storage.local.remove(PANEL_TRIGGER_KEY);
+        }
+      } catch {}
       const allTabs = await chrome.tabs.query({});
       const syncedTabs: SyncedTab[] = allTabs
         .filter((t) => t.url && !t.url.startsWith('chrome://') && !t.url.startsWith('chrome-extension://'))

@@ -324,11 +324,10 @@ export function ChatPanel() {
       {/* Messages */}
       <div className="flex-1 overflow-auto px-3 py-2 space-y-3">
         {(!activeSession || activeSession.messages.length === 0) && (
-          <div className="flex flex-col items-center justify-center h-full text-center">
-            <Bot className="h-8 w-8 text-muted-foreground/40 mb-2" />
-            <p className="text-sm text-muted-foreground/60 font-medium">MindShelf AI</p>
-            <p className="text-xs text-muted-foreground/40 mt-1">
-              {agentMode ? '🔧 Agent 模式：我可以直接执行标签管理操作' : '问我任何关于标签管理的问题'}
+          <div className="flex flex-col items-center justify-center h-full text-center px-2">
+            <Bot className="h-8 w-8 text-muted-foreground/30 mb-2" />
+            <p className="text-xs text-muted-foreground/50 mt-1">
+              {agentMode ? '🤖 Agent 可以直接搜索、分类、导出、关闭你的标签' : '💬 随时问我关于标签和页面内容的问题'}
             </p>
             {activePageContext && (
               <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10 text-left max-w-[90%]">
@@ -340,13 +339,24 @@ export function ChatPanel() {
                 <button onClick={() => setActivePageContext(null)} className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground text-[10px] ml-1">&times;</button>
               </div>
             )}
-            <div className="mt-4 space-y-1.5">
+            <div className="mt-4 space-y-1 w-full max-w-[280px]">
               {(agentMode
-                ? ['查看我的标签统计', '把tech分类的标签保存到Apple Notes', '帮我关闭所有shopping标签']
-                : ['列出所有tech分类的标签', '帮我整理重复的标签', '总结一下我打开的标签']
+                ? [
+                    { icon: '📊', text: '分析一下我的标签分布' },
+                    { icon: '🗂️', text: '把所有 AI 相关标签导出到笔记' },
+                    { icon: '🧹', text: '关掉超过一周没看的标签' },
+                    { icon: '🔍', text: '搜索所有 GitHub 相关的标签' },
+                  ]
+                : [
+                    { icon: '📝', text: '总结当前页面的核心内容' },
+                    { icon: '🏷️', text: '我的标签有哪些分类？' },
+                    { icon: '🔄', text: '有哪些重复标签可以清理？' },
+                    { icon: '💡', text: '推荐我应该优先阅读哪些标签' },
+                  ]
               ).map(q => (
-                <button key={q} onClick={() => setInput(q)} className="block w-full px-3 py-1.5 text-xs text-left rounded-lg border border-border hover:bg-muted/50 transition-colors">
-                  {q}
+                <button key={q.text} onClick={() => setInput(q.text)} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left rounded-lg border border-border/60 hover:bg-muted/50 hover:border-primary/30 transition-colors">
+                  <span>{q.icon}</span>
+                  <span className="text-muted-foreground">{q.text}</span>
                 </button>
               ))}
             </div>
