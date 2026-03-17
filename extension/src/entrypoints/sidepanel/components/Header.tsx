@@ -59,14 +59,26 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
 
   return (
     <div className="border-b border-border shrink-0">
-      <div className="flex items-center justify-between px-2 py-1.5 gap-1 min-w-0">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <img src="/icon-32.png" className="h-4 w-4 shrink-0 rounded-sm" alt="" />
-          <h1 className="text-xs font-semibold">MindShelf</h1>
-          <span className="text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded-full leading-none">
-            {tabs.length}
-          </span>
+      <div className="flex items-center px-2 py-1 gap-1 min-w-0">
+        <div className="flex items-center shrink-0">
+          {([
+            { key: 'tabs' as Panel, label: `标签 ${tabs.length}`, icon: '📑' },
+            { key: 'chat' as Panel, label: 'AI', icon: '💬' },
+          ]).map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setActivePanel(key)}
+              className={cn(
+                'px-2 py-1 text-[11px] font-medium rounded-md transition-colors',
+                activePanel === key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
+              )}
+            >
+              {icon} {label}
+            </button>
+          ))}
         </div>
+
+        <div className="flex-1" />
 
         <div className="flex items-center gap-0.5 shrink-0">
           {activePanel === 'tabs' && (
@@ -116,24 +128,6 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
             <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
-      </div>
-
-      <div className="flex border-t border-border/50">
-        {([
-          { key: 'tabs' as Panel, label: '📑 标签' },
-          { key: 'chat' as Panel, label: '💬 AI' },
-        ]).map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setActivePanel(key)}
-            className={cn(
-              'flex-1 px-3 py-1.5 text-xs font-medium transition-colors border-b-2',
-              activePanel === key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {label}
-          </button>
-        ))}
       </div>
 
       {isClassifying && classifyProgress && (
