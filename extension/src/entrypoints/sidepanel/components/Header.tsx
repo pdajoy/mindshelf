@@ -62,9 +62,9 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
       <div className="flex items-center px-2 py-1 gap-1 min-w-0">
         <div className="flex items-center gap-0.5 shrink-0">
           {([
-            { key: 'tabs' as Panel, label: `标签 ${tabs.length}`, icon: '📑', tip: '浏览、分类、导出你的标签页' },
-            { key: 'chat' as Panel, label: 'AI Agent', icon: '🤖', tip: 'AI 聊天与标签操作助手' },
-          ]).map(({ key, label, icon, tip }) => (
+            { key: 'tabs' as Panel, label: '标签', badge: tabs.length, icon: '📑', tip: '浏览、分类、导出你的标签页' },
+            { key: 'chat' as Panel, label: 'AI Agent', badge: null, icon: '🤖', tip: 'AI 聊天与标签操作助手' },
+          ]).map(({ key, label, badge, icon, tip }) => (
             <button
               key={key}
               onClick={() => setActivePanel(key)}
@@ -75,6 +75,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
               )}
             >
               {icon} {label}
+              {badge != null && <span className="ml-0.5 text-[10px] opacity-50 font-normal">{badge}</span>}
             </button>
           ))}
         </div>
