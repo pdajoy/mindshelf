@@ -28,53 +28,64 @@ Anxiety ("I have 300 tabs")
 - **Knowledge Export** — Save to **Apple Notes** (rich HTML), **Obsidian** (Markdown + YAML frontmatter), or download as `.md`
 - **Content Extraction** — Defuddle / Readability / plaintext, switchable per tab
 - **Virtual Scrolling** — Handles 2000+ tabs smoothly
-- **Multi-Provider AI** — OpenAI, Anthropic, Ollama (+ any OpenAI-compatible API)
+- **Multi-Provider AI** — OpenAI, Anthropic, and any OpenAI-compatible API (Ollama, vLLM, Azure, etc.)
 - **Dark Mode** — System / Light / Dark theme cycling
 
 ## Quick Start
 
-### 1. Start the backend
+### Option A: Download from Release (recommended)
+
+1. Go to [Releases](https://github.com/pdajoy/mindshelf/releases) and download the latest Chrome extension zip
+2. Unzip and load in `chrome://extensions/` (Developer mode → Load unpacked)
+3. Start the backend with Docker:
 
 ```bash
+docker run -d -p 3456:3456 \
+  -e AI_PROVIDER=openai \
+  -e OPENAI_API_KEY=sk-xxx \
+  -e OPENAI_MODEL=gpt-4o-mini \
+  ghcr.io/pdajoy/mindshelf/backend:main
+```
+
+### Option B: Build from source
+
+```bash
+# Backend
 cd backend
 cp .env.example .env    # fill in your AI API key
 npm install && npm run dev
-```
 
-### 2. Build the extension
-
-```bash
+# Extension
 cd extension
 npm install && npm run build
+# Load extension/dist/chrome-mv3/ in chrome://extensions/
+
+# Development (HMR)
+npm run dev
 ```
 
-Load `extension/dist/chrome-mv3/` as an unpacked extension in `chrome://extensions/` (Developer mode on).
-
-For development with HMR: `npm run dev`
-
-### 3. Use it
+### Use it
 
 Open the side panel → tabs are scanned automatically → click **Classify** → AI categorizes everything → click **export** on any tab → save to your notes → close tabs, worry-free.
 
-### Docker (optional)
-
-```bash
-docker pull ghcr.io/pdajoy/mindshelf/backend:main
-docker run -d -p 3456:3456 -e AI_PROVIDER=openai -e OPENAI_API_KEY=sk-xxx ghcr.io/pdajoy/mindshelf/backend:main
-```
-
 ## Configuration
 
-Create `backend/.env` from `.env.example`:
+Create `backend/.env` from `.env.example`, or pass as Docker env vars:
 
 ```env
-AI_PROVIDER=openai              # openai | anthropic | ollama
+AI_PROVIDER=openai              # openai | anthropic
 OPENAI_API_KEY=sk-xxx
 OPENAI_MODEL=gpt-4o-mini
-OBSIDIAN_VAULT_PATH=/path/to/vault  # direct file write, no Obsidian running needed
+
+# For Ollama or other OpenAI-compatible APIs:
+# OPENAI_BASE_URL=http://localhost:11434/v1
+# OPENAI_API_KEY=ollama
+
+# Obsidian export (direct file write, no Obsidian running needed)
+OBSIDIAN_VAULT_PATH=/path/to/vault
 ```
 
-See [`.env.example`](backend/.env.example) for all options (Anthropic, Ollama, Obsidian REST API, etc).
+See [`.env.example`](backend/.env.example) for all options.
 
 ## Architecture
 
@@ -95,8 +106,6 @@ Backend (Express + TypeScript, in-memory)
 ```
 
 ## API
-
-The backend exposes a REST + SSE API:
 
 | Endpoint | Description |
 |----------|-------------|

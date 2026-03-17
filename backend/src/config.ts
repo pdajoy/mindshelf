@@ -4,7 +4,7 @@ export const config = {
   port: parseInt(process.env.PORT || '3456', 10),
 
   ai: {
-    provider: (process.env.AI_PROVIDER || 'openai') as 'openai' | 'anthropic' | 'ollama',
+    provider: (process.env.AI_PROVIDER || 'openai') as 'openai' | 'anthropic',
     openai: {
       apiKey: process.env.OPENAI_API_KEY || '',
       baseURL: process.env.OPENAI_BASE_URL || undefined,
@@ -13,10 +13,6 @@ export const config = {
     anthropic: {
       apiKey: process.env.ANTHROPIC_API_KEY || '',
       model: process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514',
-    },
-    ollama: {
-      baseURL: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
-      model: process.env.OLLAMA_MODEL || 'llama3.2',
     },
   },
 

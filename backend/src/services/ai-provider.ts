@@ -4,7 +4,6 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 
 let openaiProvider: ReturnType<typeof createOpenAI> | null = null;
 let anthropicProvider: ReturnType<typeof createAnthropic> | null = null;
-let ollamaProvider: ReturnType<typeof createOpenAI> | null = null;
 
 function getOpenAIProvider() {
   if (!openaiProvider) {
@@ -25,38 +24,26 @@ function getAnthropicProvider() {
   return anthropicProvider;
 }
 
-function getOllamaProvider() {
-  if (!ollamaProvider) {
-    const base = config.ai.ollama.baseURL.replace(/\/+$/, '');
-    ollamaProvider = createOpenAI({
-      baseURL: `${base}/v1`,
-      apiKey: 'ollama',
-    });
-  }
-  return ollamaProvider;
-}
-
 export function getModel(modelOverride?: string) {
   const provider = config.ai.provider;
-
-  if (provider === 'openai') {
-    return getOpenAIProvider().chat(modelOverride || config.ai.openai.model);
-  }
 
   if (provider === 'anthropic') {
     return getAnthropicProvider()(modelOverride || config.ai.anthropic.model);
   }
 
-  return getOllamaProvider().chat(modelOverride || config.ai.ollama.model);
+  return getOpenAIProvider().chat(modelOverride || config.ai.openai.model);
 }
 
 export function getAvailableModels() {
   const models: Array<{ provider: string; model: string; label: string; isDefault: boolean }> = [];
   if (config.ai.openai.apiKey && config.ai.openai.apiKey !== 'sk-xxx') {
+    const label = config.ai.openai.baseURL
+      ? `OpenAI-Compatible: ${config.ai.openai.model}`
+      : `OpenAI: ${config.ai.openai.model}`;
     models.push({
       provider: 'openai',
       model: config.ai.openai.model,
-      label: `OpenAI: ${config.ai.openai.model}`,
+      label,
       isDefault: config.ai.provider === 'openai',
     });
   }
@@ -68,11 +55,5 @@ export function getAvailableModels() {
       isDefault: config.ai.provider === 'anthropic',
     });
   }
-  models.push({
-    provider: 'ollama',
-    model: config.ai.ollama.model,
-    label: `Ollama: ${config.ai.ollama.model}`,
-    isDefault: config.ai.provider === 'ollama',
-  });
   return models;
 }

@@ -99,6 +99,10 @@ export function ChatPanel() {
     }
   }, [pendingSummarizeTabId]);
 
+  useEffect(() => {
+    detectActivePage();
+  }, []);
+
   const handleSummarizeTab = async (tab: typeof tabs[0]) => {
     let contentText = tab.content_text || '';
     if (!contentText && tab.source_tab_id) {
@@ -130,14 +134,35 @@ export function ChatPanel() {
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
-    const msg = input;
+    let msg = input;
     setInput('');
+    if (activePageContext && activeSession && activeSession.messages.length === 0) {
+      msg = `[当前页面] ${activePageContext.title}\n${activePageContext.url}\n\n${msg}`;
+      setActivePageContext(null);
+    }
     await sendMessage(msg);
+  };
+
+  const [activePageContext, setActivePageContext] = useState<{ title: string; url: string; domain: string; favicon?: string } | null>(null);
+
+  const detectActivePage = async () => {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
+        const domain = new URL(tab.url).hostname.replace('www.', '');
+        setActivePageContext({ title: tab.title || '', url: tab.url, domain, favicon: tab.favIconUrl });
+      } else {
+        setActivePageContext(null);
+      }
+    } catch {
+      setActivePageContext(null);
+    }
   };
 
   const handleNewChat = () => {
     createSession();
     setShowSidebar(false);
+    detectActivePage();
     inputRef.current?.focus();
   };
 
@@ -305,6 +330,16 @@ export function ChatPanel() {
             <p className="text-xs text-muted-foreground/40 mt-1">
               {agentMode ? '🔧 Agent 模式：我可以直接执行标签管理操作' : '问我任何关于标签管理的问题'}
             </p>
+            {activePageContext && (
+              <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10 text-left max-w-[90%]">
+                {activePageContext.favicon && <img src={activePageContext.favicon} className="h-3.5 w-3.5 rounded-sm shrink-0" alt="" />}
+                <div className="min-w-0">
+                  <div className="text-[10px] text-muted-foreground truncate">{activePageContext.title}</div>
+                  <div className="text-[9px] text-muted-foreground/50 truncate">{activePageContext.domain}</div>
+                </div>
+                <button onClick={() => setActivePageContext(null)} className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground text-[10px] ml-1">&times;</button>
+              </div>
+            )}
             <div className="mt-4 space-y-1.5">
               {(agentMode
                 ? ['查看我的标签统计', '把tech分类的标签保存到Apple Notes', '帮我关闭所有shopping标签']

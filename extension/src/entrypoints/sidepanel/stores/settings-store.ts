@@ -85,21 +85,31 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     try {
       const r = await chrome.storage.local.get(STORAGE_KEY);
       const s = r[STORAGE_KEY];
-      if (!s) return;
-      const u: Record<string, unknown> = {};
-      for (const k of SYNC_KEYS) if (s[k] !== undefined) u[k] = s[k];
-      if (Object.keys(u).length) {
-        set(u as any);
-        if (u.theme) applyTheme(u.theme as ThemeMode);
+      if (s) {
+        const u: Record<string, unknown> = {};
+        for (const k of SYNC_KEYS) if (s[k] !== undefined) u[k] = s[k];
+        if (Object.keys(u).length) set(u as any);
       }
     } catch {}
+    applyTheme(get().theme);
   },
 }));
 
 function applyTheme(theme: ThemeMode) {
   const root = document.documentElement;
   root.classList.remove('light', 'dark');
-  if (theme !== 'system') root.classList.add(theme);
+  if (theme === 'system') {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    root.classList.add(isDark ? 'dark' : 'light');
+  } else {
+    root.classList.add(theme);
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+    if (useSettingsStore.getState().theme === 'system') applyTheme('system');
+  });
 }
 
 function persist(partial: Record<string, unknown>) {
