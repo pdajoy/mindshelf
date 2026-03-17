@@ -59,61 +59,61 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
 
   return (
     <div className="border-b border-border shrink-0">
-      <div className="flex items-center justify-between px-3 py-2">
-        <div className="flex items-center gap-2">
-          <Brain className="h-5 w-5 text-primary" />
-          <h1 className="text-sm font-semibold">MindShelf</h1>
-          <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded-full">
+      <div className="flex items-center justify-between px-2 py-1.5 gap-1 min-w-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Brain className="h-4 w-4 text-primary shrink-0" />
+          <h1 className="text-xs font-semibold">MindShelf</h1>
+          <span className="text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded-full leading-none">
             {tabs.length}
           </span>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-0.5 shrink-0">
           {activePanel === 'tabs' && (
             <>
               <button
                 onClick={() => startClassify()}
                 disabled={isClassifying || tabs.length === 0}
                 className={cn(
-                  'flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors',
+                  'flex items-center gap-0.5 px-1.5 py-1 text-[11px] rounded-md transition-colors',
                   isClassifying ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-primary/10 text-primary hover:bg-primary/20',
                 )}
               >
-                <Sparkles className="h-3 w-3" />
-                {isClassifying ? `${classifyProgress?.stageName || '分类中'}...` : '分类'}
+                <Sparkles className="h-3 w-3 shrink-0" />
+                {isClassifying ? `${classifyProgress?.stageName || '...'}` : '分类'}
               </button>
 
               <button
                 onClick={handleDetectDups}
                 disabled={detectingDups}
                 className={cn(
-                  'flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors',
+                  'flex items-center gap-0.5 px-1.5 py-1 text-[11px] rounded-md transition-colors',
                   viewMode === 'duplicates'
                     ? 'bg-amber-500 text-white'
                     : 'bg-amber-100/80 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
                 )}
                 title="重复检测"
               >
-                {detectingDups ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3" />}
-                {duplicateGroups.length > 0 ? `重复(${duplicateGroups.length})` : '去重'}
+                {detectingDups ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3 shrink-0" />}
+                {duplicateGroups.length > 0 ? `${duplicateGroups.length}` : '去重'}
               </button>
 
               <button
                 onClick={handleScan}
                 disabled={isScanning}
-                className={cn('p-1.5 rounded-md transition-colors', isScanning ? 'text-primary animate-spin' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
+                className={cn('p-1 rounded-md transition-colors', isScanning ? 'text-primary animate-spin' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
                 title="扫描标签"
               >
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </>
           )}
 
-          <button onClick={cycleTheme} className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title={`主题: ${theme}`}>
-            <ThemeIcon className="h-4 w-4" />
+          <button onClick={cycleTheme} className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title={`主题: ${theme}`}>
+            <ThemeIcon className="h-3.5 w-3.5" />
           </button>
-          <button onClick={toggleSettings} className="p-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title="设置">
-            <Settings className="h-4 w-4" />
+          <button onClick={toggleSettings} className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title="设置">
+            <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>

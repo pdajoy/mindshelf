@@ -12,8 +12,14 @@ export function App() {
 
   useEffect(() => {
     chrome.storage.local.get('mindshelf_settings').then(r => {
-      const t = r.mindshelf_settings?.theme;
-      if (t && t !== 'system') document.documentElement.classList.add(t);
+      const t = r.mindshelf_settings?.theme || 'system';
+      const root = document.documentElement;
+      root.classList.remove('light', 'dark');
+      if (t === 'system') {
+        root.classList.add(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      } else {
+        root.classList.add(t);
+      }
     }).catch(() => {});
 
     chrome.tabs.query({}).then((tabs) => {
