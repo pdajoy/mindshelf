@@ -1,22 +1,32 @@
 {
-  "name": "chrome-tab-helper-backend",
-  "version": "0.1.0",
-  "description": "Backend service for Chrome Tab Helper - AI-powered tab management",
+  "name": "mindshelf-backend",
+  "version": "2.0.0",
+  "private": true,
   "type": "module",
-  "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js",
-    "mcp": "node src/mcp/server.js"
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "start:prod": "node dist/index.js"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0",
-    "@modelcontextprotocol/sdk": "^1.8.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "openai": "^4.82.0",
-    "uuid": "^11.1.0",
-    "zod": "^3.24.0"
+    "@ai-sdk/anthropic": "^3.0.58",
+    "@ai-sdk/openai": "^3.0.41",
+    "@mozilla/readability": "^0.6.0",
+    "ai": "^6.0.116",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "linkedom": "^0.18.12",
+    "marked": "^17.0.4",
+    "turndown": "^7.2.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/turndown": "^5.0.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
   }
 }

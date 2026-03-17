@@ -1,11 +1,44 @@
+# Dependencies
 node_modules/
-.env
-backend/data/
-reports/
-*.log
-*.zip
-.DS_Store
+
+# Build outputs
 dist/
+.wxt/
+
+# Environment & secrets
+.env
+*.env.local
+
+# Data & database
+backend/data/
+*.db
+
+# V1 archive (local only)
+_archive/
+
+# Logs
+*.log
+
+# Archives & backups
+*.zip
+chrome_tab_helper_*/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
 .vscode/
+.idea/
+
+# Python
 __pycache__/
 *.pyc
+venv/
+
+# Internal docs (plans, research)
+PLAN-*.md
+RESEARCH-*.md
+
+# Reports
+reports/

@@ -11,15 +11,18 @@ EXCLUDES=(
   "node_modules/*"
   "backend/data/*"
   "backend/.env"
+  "_archive/*"
   "reports/*"
   ".DS_Store"
   "*.zip"
   "*.log"
   ".vscode/*"
   "dist/*"
+  ".wxt/*"
   "__pycache__/*"
   "*.pyc"
   ".git/*"
+  "chrome_tab_helper_*"
 )
 
 EXCLUDE_ARGS=()

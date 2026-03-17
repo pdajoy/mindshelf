@@ -1,0 +1,394 @@
+import { generateObject } from 'ai';
+import { z } from 'zod';
+import { getModel } from './ai-provider.js';
+import { updateTab } from '../db/tab-repo.js';
+
+export interface CategoryDef {
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export const CATEGORY_DEFINITIONS: Record<string, CategoryDef> = {
+  'ai-ml': { name: 'AI/机器学习', icon: '🤖', color: '#8B5CF6' },
+  'programming': { name: '编程开发', icon: '💻', color: '#007AFF' },
+  'devops': { name: '运维/DevOps', icon: '🚀', color: '#06B6D4' },
+  'security': { name: '安全/逆向', icon: '🔒', color: '#DC2626' },
+  'networking': { name: '网络/协议', icon: '🌐', color: '#0EA5E9' },
+  'research': { name: '研究/学术', icon: '🔬', color: '#5856D6' },
+  'news': { name: '新闻/资讯', icon: '📰', color: '#FF9500' },
+  'design': { name: '设计/创意', icon: '🎨', color: '#FF2D55' },
+  'business': { name: '商业/金融', icon: '💼', color: '#34C759' },
+  'entertainment': { name: '娱乐/视频', icon: '🎬', color: '#FF3B30' },
+  'social': { name: '社交/论坛', icon: '💬', color: '#5AC8FA' },
+  'shopping': { name: '购物/电商', icon: '🛒', color: '#AF52DE' },
+  'reference': { name: '参考/文档', icon: '📚', color: '#30B0C7' },
+  'tools': { name: '工具/服务', icon: '🔧', color: '#8E8E93' },
+  'other': { name: '其他', icon: '📌', color: '#9CA3AF' },
+};
+
+const DOMAIN_RULES: Array<{ pattern: RegExp; category: string }> = [
+  // AI/ML — specific before general
+  { pattern: /huggingface|openai\.com|anthropic\.com|ollama|replicate\.com|together\.ai|deepseek|groq\.com|mistral\.ai|cohere\.com|wandb\.ai|mlflow/i, category: 'ai-ml' },
+  // Security / Reverse engineering
+  { pattern: /kanxue\.com|freebuf|seebug|exploit-db|cve\.|hackerone|bugcrowd|virustotal|shodan|crackstation|ghidra|radare/i, category: 'security' },
+  // DevOps / Infra / Cloud
+  { pattern: /docker\.com|kubernetes\.io|k8s|terraform|ansible|jenkins|grafana|prometheus|datadog|cloudflare|aws\.amazon|cloud\.google|azure\.microsoft|vercel\.com|netlify|railway|render\.com|fly\.io/i, category: 'devops' },
+  // Networking
+  { pattern: /openwrt|mikrotik|pfsense|ubiquiti|unifi|opnsense|softether|wireguard|tailscale|zerotier/i, category: 'networking' },
+  // Reference / Docs (before programming to catch docs sites)
+  { pattern: /docs\.|documentation|readme|wiki\.|developer\.|devdocs|man7\.org|manpages/i, category: 'reference' },
+  // Programming / Dev platforms (general code hosts)
+  { pattern: /github\.com|gitlab|bitbucket|stackoverflow|stackexchange|npmjs|pypi|crates\.io|pkg\.go\.dev|rubygems|packagist/i, category: 'programming' },
+  // Research
+  { pattern: /arxiv|scholar\.google|researchgate|ieee|acm\.org|nature\.com|sciencedirect|ssrn|pubmed/i, category: 'research' },
+  // Entertainment
+  { pattern: /youtube|twitch|netflix|spotify|bilibili|v\.qq|iqiyi|disneyplus|hbo|primevideo/i, category: 'entertainment' },
+  // Social
+  { pattern: /twitter|x\.com|facebook|instagram|reddit|weibo|zhihu|v2ex|discourse|mastodon|threads\.net|wechat|weixin|mp\.weixin/i, category: 'social' },
+  // Shopping
+  { pattern: /amazon|taobao|jd\.com|ebay|shopify|aliexpress|pinduoduo|walmart/i, category: 'shopping' },
+  // Design
+  { pattern: /figma|dribbble|behance|canva|sketch|framer|adobe\.com\/products/i, category: 'design' },
+  // Business
+  { pattern: /bloomberg|reuters|wsj|ft\.com|cnbc|investing|crunchbase|pitchbook/i, category: 'business' },
+  // News
+  { pattern: /bbc|cnn|nytimes|theguardian|36kr|ifanr|sspai|techcrunch|theverge|arstechnica/i, category: 'news' },
+  // Tools
+  { pattern: /notion|trello|slack|asana|linear|supabase|postman|insomnia/i, category: 'tools' },
+  // Tech blogs — need title analysis to further distinguish, set as programming by default
+  { pattern: /juejin|segmentfault|csdn|cnblogs|jianshu|medium\.com|dev\.to|hashnode/i, category: 'programming' },
+];
+
+const TITLE_KEYWORDS: Record<string, RegExp> = {
+  'ai-ml': /(llm|gpt|claude|gemini|模型|ai\b|机器学习|深度学习|neural|transformer|embedding|rag|prompt|agent|mcp|diffusion|stable\s*diffusion|midjourney|copilot|fine-?tun|lora|gguf|ggml|ollama|langchain|langsmith|chatgpt|openai|anthropic|token|向量|vector\s*db|训练|inference|推理)/i,
+  'security': /(逆向|reverse|crack|漏洞|exploit|cve|渗透|pentest|xss|sql\s*inject|pwn|ctf|malware|病毒|加密|decrypt|hook|frida|ida\s*pro|ghidra|二进制|binary\s*analy|shellcode|安全|security|防火墙|firewall)/i,
+  'devops': /(docker|kubernetes|k8s|ci\/cd|devops|部署|deploy|terraform|ansible|jenkins|grafana|prometheus|nginx|运维|监控|容器|container|helm|argocd|github\s*action)/i,
+  'networking': /(路由|router|交换机|switch|vlan|subnet|dns|dhcp|tcp|udp|iptables|网络|network|openwrt|软路由|旁路由|mesh|wifi|wireguard|vpn|proxy|代理|clash|v2ray|trojan|tailscale)/i,
+  'programming': /(api|sdk|framework|库|框架|开发|编程|代码|前端|后端|全栈|react|vue|angular|node|python|golang|rust|java|typescript|javascript|swift|kotlin|flutter|c\+\+|编译|compiler|算法|algorithm|数据结构|设计模式|重构|refactor)/i,
+  'reference': /(文档|documentation|docs|tutorial|教程|指南|guide|手册|manual|reference|api\s*reference|入门|getting\s*started|quickstart|cheatsheet)/i,
+  'research': /(论文|paper|研究|survey|arxiv|study|analysis|实验|experiment|学术)/i,
+  'news': /(发布|release|announce|更新|update|版本|version|新闻|news|报道|刚刚)/i,
+  'design': /(设计|design|ui|ux|figma|原型|prototype|色彩|typography|布局|layout|motion|动效)/i,
+  'business': /(融资|投资|商业|创业|startup|saas|revenue|估值|valuation|ipo|市场|market)/i,
+};
+
+const AI_CLASSIFY_PROMPT = `你是一个智能网页标签分类专家。目标是将浏览器标签页精确归类到最合适的细分类别。
+
+可用类别（严格使用这些 ID）：
+- ai-ml: AI/机器学习 — LLM, prompt工程, 训练, 模型, RAG, Agent, 向量数据库, AI应用
+- programming: 编程开发 — 编程语言, 框架, 前端, 后端, 算法, 开源项目, 代码实践
+- devops: 运维/DevOps — Docker, K8s, CI/CD, 云服务, 监控, 部署, 基础设施
+- security: 安全/逆向 — 渗透测试, 漏洞, 逆向工程, CTF, 二进制分析, 加密
+- networking: 网络/协议 — 路由, 交换, VLAN, DNS, VPN, 代理, WiFi, 软路由, 网络架构
+- research: 研究/学术 — 论文, 学术研究, 实验, 数据分析
+- news: 新闻/资讯 — 新闻报道, 行业动态（纯资讯性内容）
+- design: 设计/创意 — UI/UX, 平面设计, 动效, 原型
+- business: 商业/金融 — 创业, 投资, 市场分析, SaaS
+- entertainment: 娱乐/视频 — 视频, 音乐, 游戏, 影视
+- social: 社交/论坛 — 社交媒体, 论坛讨论（非技术内容为主）
+- shopping: 购物/电商 — 网购, 商品, 电商平台
+- reference: 参考/文档 — 官方文档, 教程, API参考, 手册
+- tools: 工具/服务 — SaaS工具, 在线服务, 效率工具
+- other: 其他
+
+关键分类原则：
+1. 看内容本质而非来源平台。GitHub上的AI项目→ai-ml，GitHub上的路由器固件→networking
+2. 技术博客/论坛（CSDN/掘金/Medium等）：根据文章具体主题分类，不要笼统归为 programming
+3. AI相关内容要仔细区分：prompt工程→ai-ml，用AI写代码的教程→programming，AI安全→security
+4. 分类必须反映用户真实的知识管理需求——"这篇内容属于我的哪个知识领域？"
+5. 生成tags时要具体有意义，例如 ["C++", "编译器", "LLVM"] 而非泛泛的 ["tech", "code"]
+
+请严格返回 JSON：
+{
+  "classifications": [
+    {
+      "id": "标签ID",
+      "category": "类别ID",
+      "confidence": 0.0-1.0,
+      "reason": "简短理由",
+      "tags": ["具体标签1", "具体标签2", "具体标签3"]
+    }
+  ]
+}`;
+
+interface TabInput {
+  id: string;
+  url: string;
+  title: string;
+  domain: string;
+  content_text?: string | null;
+}
+
+interface ClassifyResult {
+  category: string;
+  confidence: number;
+  source: string;
+  reason?: string;
+  tags?: string[];
+}
+
+interface ProgressEvent {
+  stage: number;
+  stageName: string;
+  stageDesc: string;
+  processed: number;
+  total: number;
+  pct: number;
+  [key: string]: unknown;
+}
+
+export async function categorizeTabs(
+  tabs: TabInput[],
+  opts: { onProgress?: (p: ProgressEvent) => void; model?: string } = {}
+) {
+  const { onProgress, model } = opts;
+  const results: Record<string, ClassifyResult> = {};
+
+  // === Phase 1: Domain grouping ===
+  onProgress?.({ stage: 1, stageName: '域名聚合', stageDesc: '按域名快速分组', processed: 0, total: tabs.length, pct: 0 });
+
+  const domainGroups: Record<string, TabInput[]> = {};
+  for (const tab of tabs) {
+    const d = tab.domain || 'unknown';
+    if (!domainGroups[d]) domainGroups[d] = [];
+    domainGroups[d].push(tab);
+  }
+
+  const topDomains = Object.entries(domainGroups)
+    .sort((a, b) => b[1].length - a[1].length)
+    .slice(0, 5)
+    .map(([d, list]) => `${d}(${list.length})`);
+
+  onProgress?.({
+    stage: 1, stageName: '域名聚合',
+    stageDesc: `发现 ${Object.keys(domainGroups).length} 个域名，重点来源：${topDomains.join('、') || '无'}`,
+    processed: tabs.length, total: tabs.length, pct: 100,
+  });
+
+  // === Phase 2: Rule-based ===
+  onProgress?.({ stage: 2, stageName: '规则识别', stageDesc: '匹配已知平台和域名模式', processed: 0, total: tabs.length, pct: 0 });
+
+  const CONTENT_PLATFORMS = /juejin|segmentfault|csdn|cnblogs|jianshu|medium\.com|dev\.to|hashnode|zhihu|v2ex|reddit/i;
+
+  let ruleMatched = 0;
+  for (const tab of tabs) {
+    const fullUrl = tab.url || tab.domain || '';
+    for (const { pattern, category } of DOMAIN_RULES) {
+      if (pattern.test(fullUrl)) {
+        const isContentPlatform = CONTENT_PLATFORMS.test(fullUrl);
+        results[tab.id] = {
+          category,
+          confidence: isContentPlatform ? 0.5 : 0.75,
+          source: 'rule',
+          tags: generateBasicTags(tab, category),
+        };
+        ruleMatched++;
+        break;
+      }
+    }
+  }
+
+  onProgress?.({
+    stage: 2, stageName: '规则识别',
+    stageDesc: `${ruleMatched}/${tabs.length} 命中已知规则`,
+    processed: tabs.length, total: tabs.length, pct: 100,
+  });
+
+  // === Phase 3: Title keywords ===
+  onProgress?.({ stage: 3, stageName: '标题分析', stageDesc: '通过标题关键词判断类别', processed: 0, total: tabs.length, pct: 0 });
+
+  let titleMatched = 0;
+  for (const tab of tabs) {
+    if (results[tab.id]?.confidence >= 0.75) continue;
+    const title = (tab.title || '').toLowerCase();
+    for (const [category, pattern] of Object.entries(TITLE_KEYWORDS)) {
+      if (pattern.test(title)) {
+        const existing = results[tab.id];
+        if (!existing || existing.confidence <= 0.6 || existing.category !== category) {
+          results[tab.id] = {
+            category, confidence: 0.65, source: 'title',
+            tags: generateBasicTags(tab, category),
+          };
+          titleMatched++;
+        }
+        break;
+      }
+    }
+  }
+
+  onProgress?.({
+    stage: 3, stageName: '标题分析',
+    stageDesc: `标题语义补全 ${titleMatched} 个标签，累计已分类 ${Object.keys(results).length}`,
+    processed: tabs.length, total: tabs.length, pct: 100,
+  });
+
+  // === Phase 4: AI deep analysis ===
+  const needsAI = tabs.filter(t => !results[t.id] || results[t.id].confidence < 0.6);
+
+  if (needsAI.length > 0) {
+    const aiModel = getModel(model);
+    const batchSize = 30;
+    const totalBatches = Math.ceil(needsAI.length / batchSize);
+
+    const classificationSchema = z.object({
+      classifications: z.array(z.object({
+        id: z.string(),
+        category: z.string(),
+        confidence: z.number().min(0).max(1).optional(),
+        reason: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+      })),
+    });
+
+    onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: `${needsAI.length} 个标签需要AI判断`, processed: 0, total: needsAI.length, pct: 0 });
+
+    for (let i = 0; i < needsAI.length; i += batchSize) {
+      const batchNum = Math.floor(i / batchSize) + 1;
+      const batch = needsAI.slice(i, i + batchSize);
+
+      onProgress?.({
+        stage: 4, stageName: 'AI 深度分析',
+        stageDesc: `批次 ${batchNum}/${totalBatches}：分析 URL + 标题 + 内容摘要`,
+        processed: i, total: needsAI.length, pct: Math.round((i / needsAI.length) * 100),
+      });
+
+      const tabList = batch.map(t => ({
+        id: t.id, url: t.url, title: t.title, domain: t.domain,
+        currentCategory: results[t.id]?.category || null,
+        ...(t.content_text ? { excerpt: t.content_text.substring(0, 200) } : {}),
+      }));
+
+      const userMsg = `请将以下 ${batch.length} 个标签归类：\n\n${JSON.stringify(tabList, null, 2)}`;
+
+      try {
+        const { object: parsed } = await generateObject({
+          model: aiModel,
+          schema: classificationSchema,
+          system: AI_CLASSIFY_PROMPT,
+          prompt: userMsg,
+          temperature: 0.3,
+        });
+
+        for (const item of parsed.classifications) {
+          const validCategory = item.category in CATEGORY_DEFINITIONS ? item.category : 'other';
+          const existing = results[item.id];
+          if (!existing || (item.confidence || 0.85) > existing.confidence) {
+            results[item.id] = {
+              category: validCategory,
+              confidence: item.confidence || 0.85,
+              reason: item.reason,
+              source: 'ai',
+              tags: item.tags,
+            };
+          }
+        }
+      } catch (err) {
+        console.error(`[Categorizer] AI batch ${batchNum} failed:`, (err as Error).message);
+        for (const tab of batch) {
+          if (!results[tab.id]) {
+            results[tab.id] = { category: 'other', confidence: 0.3, source: 'fallback' };
+          }
+        }
+      }
+    }
+
+    onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: 'AI 分析完成', processed: needsAI.length, total: needsAI.length, pct: 100 });
+  } else {
+    onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: '所有标签已通过规则和标题分类，跳过AI', processed: 0, total: 0, pct: 100 });
+  }
+
+  // === Phase 5: Consolidation ===
+  onProgress?.({ stage: 5, stageName: '整合修正', stageDesc: '交叉验证并合并分类结果', processed: 0, total: tabs.length, pct: 0 });
+
+  for (const tab of tabs) {
+    if (!results[tab.id]) {
+      results[tab.id] = { category: 'other', confidence: 0.3, source: 'default' };
+    }
+  }
+
+  const catCounts: Record<string, number> = {};
+  let confSum = 0;
+  for (const r of Object.values(results)) {
+    catCounts[r.category] = (catCounts[r.category] || 0) + 1;
+    confSum += r.confidence;
+  }
+
+  const profileHint = inferProfileHint(catCounts, tabs.length);
+
+  const stats = {
+    total: tabs.length,
+    byCategory: catCounts,
+    avgConfidence: Math.round((confSum / tabs.length) * 100),
+    profileHint,
+  };
+
+  onProgress?.({
+    stage: 5, stageName: '整合修正',
+    stageDesc: `分类完成 · 平均置信度 ${stats.avgConfidence}% · 画像倾向 ${profileHint}`,
+    processed: tabs.length, total: tabs.length, pct: 100,
+  });
+
+  return { classifications: results, stats };
+}
+
+export function applyClassifications(classifications: Record<string, ClassifyResult>) {
+  const now = new Date().toISOString();
+  for (const [tabId, data] of Object.entries(classifications)) {
+    const tags = data.tags ? JSON.stringify(data.tags) : '[]';
+    updateTab(tabId, { topic: data.category, tags, processed_at: now } as any);
+  }
+}
+
+function generateBasicTags(tab: TabInput, category: string): string[] {
+  const tags: string[] = [];
+  const title = (tab.title || '').toLowerCase();
+  const domain = tab.domain || '';
+
+  if (domain.includes('github.com')) tags.push('GitHub');
+  else if (domain.includes('stackoverflow')) tags.push('StackOverflow');
+
+  const termGroups: Array<{ terms: string[]; tag: string }> = [
+    { terms: ['react', 'nextjs', 'next.js'], tag: 'React' },
+    { terms: ['vue', 'nuxt'], tag: 'Vue' },
+    { terms: ['python', 'django', 'flask', 'fastapi'], tag: 'Python' },
+    { terms: ['rust', 'cargo'], tag: 'Rust' },
+    { terms: ['golang', 'go '], tag: 'Go' },
+    { terms: ['docker', 'container'], tag: 'Docker' },
+    { terms: ['kubernetes', 'k8s'], tag: 'K8s' },
+    { terms: ['llm', 'gpt', 'chatgpt', 'claude', 'gemini'], tag: 'LLM' },
+    { terms: ['prompt'], tag: 'Prompt' },
+    { terms: ['rag'], tag: 'RAG' },
+    { terms: ['typescript', 'ts '], tag: 'TypeScript' },
+    { terms: ['javascript', 'js '], tag: 'JavaScript' },
+    { terms: ['c++', 'cpp'], tag: 'C++' },
+    { terms: ['nginx'], tag: 'Nginx' },
+    { terms: ['linux', 'debian', 'ubuntu'], tag: 'Linux' },
+    { terms: ['openwrt', '软路由'], tag: 'OpenWrt' },
+    { terms: ['vlan', '交换'], tag: 'VLAN' },
+    { terms: ['wireguard', 'vpn'], tag: 'VPN' },
+    { terms: ['逆向', 'reverse'], tag: '逆向' },
+    { terms: ['frida', 'hook'], tag: 'Frida' },
+  ];
+
+  for (const { terms, tag } of termGroups) {
+    if (terms.some(t => title.includes(t))) tags.push(tag);
+  }
+
+  return [...new Set(tags)].slice(0, 5);
+}
+
+function inferProfileHint(catCounts: Record<string, number>, total: number): string {
+  if (!total) return '未知';
+  const pct = (id: string) => (catCounts[id] || 0) / total;
+  const techTotal = pct('programming') + pct('ai-ml') + pct('devops') + pct('security') + pct('networking');
+  if (pct('ai-ml') > 0.25) return 'AI研究型';
+  if (pct('security') > 0.2) return '安全研究型';
+  if (techTotal > 0.5 && pct('research') > 0.1) return '技术研究型';
+  if (techTotal > 0.5) return '工程实践型';
+  if (pct('design') > 0.25) return '创意设计型';
+  if (pct('business') > 0.25) return '商业决策型';
+  if (pct('news') + pct('social') > 0.45) return '资讯追踪型';
+  if (pct('reference') > 0.3) return '资料归档型';
+  return '综合探索型';
+}
