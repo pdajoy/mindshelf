@@ -1,6 +1,9 @@
 import { defineConfig } from 'wxt';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync(path.resolve('package.json'), 'utf-8'));
 
 export default defineConfig({
   srcDir: 'src',
@@ -12,7 +15,7 @@ export default defineConfig({
   manifest: {
     name: 'MindShelf',
     description: 'Personal Knowledge Asset Library — AI-powered tab management and knowledge export',
-    version: '2.0.0',
+    version: pkg.version,
     permissions: [
       'tabs',
       'activeTab',

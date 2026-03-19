@@ -14,11 +14,14 @@ import { useNavStore } from './stores/nav-store';
 import { useChatStore } from './stores/chat-store';
 import { MESSAGE_TYPES } from '@/lib/types';
 import type { SyncedTab, TabRecord } from '@/lib/types';
+import { checkBackendAvailable } from '@/lib/backend-status';
+import { setBackendUrl } from '@/lib/utils';
 
 export type TabViewMode = 'list' | 'grouped' | 'duplicates';
 
 const NOTE_TRIGGER_KEY = 'mindshelf_open_note_for_url';
 const PANEL_TRIGGER_KEY = 'mindshelf_open_panel';
+const CHAT_TRIGGER_KEY = 'mindshelf_continue_chat';
 
 function Toast() {
   const toast = useNavStore(s => s.toast);
@@ -29,20 +32,26 @@ function Toast() {
     </div>
   );
 }
-const CHAT_TRIGGER_KEY = 'mindshelf_continue_chat';
 
 export function App() {
   const [viewMode, setViewMode] = useState<TabViewMode>('list');
   const [noteTab, setNoteTab] = useState<TabRecord | null>(null);
   const { activePanel, showSettings, setActivePanel } = useNavStore();
   const { syncTabs, tabs } = useTabStore();
-  const { loadModels, loadFromStorage } = useSettingsStore();
+  const { loadFromStorage } = useSettingsStore();
   const { createSession, sendMessage } = useChatStore();
 
   useEffect(() => {
     const init = async () => {
       await loadFromStorage();
-      loadModels();
+
+      // Set dynamic backend URL from settings
+      const backendUrl = useSettingsStore.getState().backendUrl;
+      setBackendUrl(backendUrl);
+
+      // Check backend availability (non-blocking)
+      checkBackendAvailable(backendUrl).catch(() => {});
+
       try {
         const r = await chrome.storage.local.get(PANEL_TRIGGER_KEY);
         if (r[PANEL_TRIGGER_KEY]) {
@@ -50,6 +59,8 @@ export function App() {
           await chrome.storage.local.remove(PANEL_TRIGGER_KEY);
         }
       } catch {}
+
+      // Scan Chrome tabs and sync
       const allTabs = await chrome.tabs.query({});
       const syncedTabs: SyncedTab[] = allTabs
         .filter((t) => t.url && !t.url.startsWith('chrome://') && !t.url.startsWith('chrome-extension://'))
@@ -105,7 +116,7 @@ export function App() {
     return () => chrome.storage.onChanged.removeListener(listener);
   }, [tabs]);
 
-  // Auto-refresh on Chrome tab events (create/close/update)
+  // Auto-refresh on Chrome tab events
   const refreshTimer = useRef<ReturnType<typeof setTimeout>>();
   const doResync = useCallback(async () => {
     const allTabs = await chrome.tabs.query({});

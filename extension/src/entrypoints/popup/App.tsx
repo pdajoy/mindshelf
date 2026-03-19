@@ -1,7 +1,38 @@
 import { useState, useEffect } from 'react';
 import { Sparkles, ExternalLink, Loader2, FileEdit, MessageSquare } from 'lucide-react';
-import { api, fetchSSE } from '@/lib/api';
+import { streamSummarize } from '@/lib/ai-chat';
 import { MarkdownPreview } from '../sidepanel/components/MarkdownPreview';
+
+const SETTINGS_KEY = 'mindshelf_settings';
+
+async function getAIConfig() {
+  try {
+    const r = await chrome.storage.local.get(SETTINGS_KEY);
+    const s = r[SETTINGS_KEY];
+    // New multi-provider format
+    if (s?.providers?.length && s?.activeProviderId && s?.activeModel) {
+      const p = s.providers.find((p: any) => p.id === s.activeProviderId);
+      if (p?.apiKey) {
+        return {
+          provider: p.type || 'openai',
+          apiKey: p.apiKey,
+          model: s.activeModel,
+          ...(p.baseUrl ? { baseUrl: p.baseUrl } : {}),
+        };
+      }
+    }
+    // Legacy single-provider fallback
+    if (s?.aiApiKey && s?.aiModel) {
+      return {
+        provider: s.aiProvider || 'openai',
+        apiKey: s.aiApiKey,
+        model: s.aiModel,
+        ...(s.aiBaseUrl ? { baseUrl: s.aiBaseUrl } : {}),
+      };
+    }
+  } catch {}
+  return null;
+}
 
 export function App() {
   const [tabCount, setTabCount] = useState(0);
@@ -9,10 +40,12 @@ export function App() {
   const [currentTab, setCurrentTab] = useState<chrome.tabs.Tab | null>(null);
   const [summary, setSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
 
   useEffect(() => {
-    chrome.storage.local.get('mindshelf_settings').then(r => {
-      const t = r.mindshelf_settings?.theme || 'system';
+    chrome.storage.local.get(SETTINGS_KEY).then(r => {
+      const s = r[SETTINGS_KEY];
+      const t = s?.theme || 'system';
       const root = document.documentElement;
       root.classList.remove('light', 'dark');
       if (t === 'system') {
@@ -20,6 +53,9 @@ export function App() {
       } else {
         root.classList.add(t);
       }
+      const hasNew = s?.providers?.length && s?.activeProviderId && s?.activeModel;
+      const hasLegacy = s?.aiApiKey && s?.aiModel;
+      setAiReady(!!(hasNew || hasLegacy));
     }).catch(() => {});
 
     chrome.tabs.query({}).then((tabs) => {
@@ -71,30 +107,25 @@ export function App() {
     setSummary('');
 
     try {
+      const config = await getAIConfig();
+      if (!config) {
+        setSummary('请先在侧边栏设置中配置 AI API Key');
+        setIsSummarizing(false);
+        return;
+      }
+
       const content = await chrome.scripting.executeScript({
         target: { tabId: currentTab.id },
         func: () => document.body.innerText.slice(0, 10000),
       });
       const text = content[0]?.result || '';
+      const domain = currentTab.url ? new URL(currentTab.url).hostname.replace('www.', '') : '';
 
-      await api.tabs.sync([{
-        url: currentTab.url!,
-        title: currentTab.title || 'Untitled',
-        favIconUrl: currentTab.favIconUrl,
-        tabId: currentTab.id,
-        windowId: currentTab.windowId!,
-      }]);
-
-      const { tabs } = await api.tabs.list();
-      const match = tabs.find(t => t.url === currentTab.url);
-      if (match) {
-        await api.tabs.update(match.id, { content_text: text });
-        for await (const msg of fetchSSE(`/api/ai/summarize/${match.id}`, {})) {
-          if (msg.type === 'chunk') {
-            const chunk = msg.content as string;
-            if (!chunk.includes('<!--CONV:')) setSummary(prev => prev + chunk);
-          }
-        }
+      for await (const chunk of streamSummarize(
+        { title: currentTab.title || '', url: currentTab.url || '', domain, content_text: text },
+        config as any,
+      )) {
+        setSummary(prev => prev + chunk);
       }
     } catch (err) {
       setSummary(`Error: ${(err as Error).message}`);
@@ -105,7 +136,6 @@ export function App() {
 
   return (
     <div className="w-[320px] p-3 space-y-2.5">
-      {/* Stats row */}
       <div className="flex gap-2">
         <div className="flex-1 p-2 rounded-lg bg-muted text-center">
           <div className="text-base font-bold">{tabCount}</div>
@@ -117,13 +147,12 @@ export function App() {
         </div>
       </div>
 
-      {/* Current page actions */}
       {currentTab && (
         <div className="space-y-2">
           <p className="text-[11px] text-muted-foreground truncate" title={currentTab.title}>📄 {currentTab.title}</p>
 
           <div className="flex gap-1.5">
-            <button onClick={handleSummarize} disabled={isSummarizing} className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+            <button onClick={handleSummarize} disabled={isSummarizing || !aiReady} className="flex-1 flex items-center justify-center gap-1 h-7 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
               {isSummarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
               {isSummarizing ? '生成中...' : 'AI 摘要'}
             </button>
@@ -131,6 +160,10 @@ export function App() {
               <FileEdit className="h-3 w-3" /> 保存笔记
             </button>
           </div>
+
+          {!aiReady && (
+            <p className="text-[10px] text-amber-600 dark:text-amber-400 text-center">请在侧边栏设置中配置 AI API Key</p>
+          )}
 
           {summary && (
             <div className="space-y-1.5">
@@ -145,18 +178,17 @@ export function App() {
         </div>
       )}
 
-      {/* Quick actions */}
       <div className="grid grid-cols-2 gap-1.5">
-        <button onClick={() => openSidePanel()} className="flex items-center justify-center gap-1 h-7 text-[11px] rounded-md border border-border hover:bg-muted">
-          <ExternalLink className="h-3 w-3" /> 打开侧边栏
-        </button>
         <button onClick={() => {
           chrome.storage.local.set({ mindshelf_open_panel: 'chat' }).then(() => {
             chrome.sidePanel.open({ windowId: currentTab?.windowId! });
             setTimeout(() => window.close(), 300);
           });
         }} className="flex items-center justify-center gap-1 h-7 text-[11px] rounded-md border border-border hover:bg-muted">
-          🤖 AI Agent
+          🤖 AI Chat
+        </button>
+        <button onClick={() => openSidePanel()} className="flex items-center justify-center gap-1 h-7 text-[11px] rounded-md border border-border hover:bg-muted">
+          <ExternalLink className="h-3 w-3" /> 打开侧边栏
         </button>
       </div>
     </div>

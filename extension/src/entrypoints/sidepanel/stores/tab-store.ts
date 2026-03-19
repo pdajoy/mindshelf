@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { TabRecord, TabFilter, SortField, SortDirection, SyncedTab, DuplicateGroupResult } from '@/lib/types';
-import { api } from '@/lib/api';
 import { getAllEnrichments, batchSaveEnrichments, pruneExpired } from '@/lib/enrichment-cache';
+import { computeCanonicalUrl, formatDomain } from '@/lib/utils';
 
 interface TabState {
   tabs: TabRecord[];
@@ -80,6 +80,56 @@ function applyFilters(
   return filtered;
 }
 
+function buildLocalTabRecords(
+  chromeTabs: SyncedTab[],
+  enrichments: Record<string, any>,
+): TabRecord[] {
+  const seen = new Map<string, TabRecord>();
+
+  for (const t of chromeTabs) {
+    const canonical = computeCanonicalUrl(t.url);
+    const domain = formatDomain(t.url);
+    const cached = enrichments[canonical];
+
+    if (seen.has(canonical)) {
+      const existing = seen.get(canonical)!;
+      existing.source_tab_id = t.tabId;
+      existing.source_window_id = t.windowId;
+      if (t.title !== 'Untitled') existing.title = t.title;
+      if (t.favIconUrl) existing.favicon_url = t.favIconUrl;
+      continue;
+    }
+
+    const record: TabRecord = {
+      id: canonical,
+      url: t.url,
+      canonical_url: canonical,
+      title: t.title,
+      domain,
+      favicon_url: t.favIconUrl || '',
+      topic: cached?.topic ?? null,
+      tags: cached?.tags ?? [],
+      ai_summary: cached?.ai_summary ?? null,
+      ai_detailed_summary: null,
+      user_score: cached?.user_score ?? null,
+      status: 'active',
+      content_text: null,
+      language: null,
+      word_count: null,
+      source_tab_id: t.tabId,
+      source_window_id: t.windowId,
+      scanned_at: new Date().toISOString(),
+      processed_at: cached?.topic ? new Date().toISOString() : null,
+      closed_at: null,
+      created_at: new Date().toISOString(),
+    };
+
+    seen.set(canonical, record);
+  }
+
+  return Array.from(seen.values());
+}
+
 export const useTabStore = create<TabState>((set, get) => ({
   tabs: [],
   selectedIds: new Set(),
@@ -95,76 +145,17 @@ export const useTabStore = create<TabState>((set, get) => ({
   syncTabs: async (chromeTabs) => {
     set({ isScanning: true, error: null });
     try {
-      // Prune expired enrichments on each sync
       pruneExpired().catch(() => {});
-      // Load persisted enrichments
       const enrichments = await getAllEnrichments();
-
-      const syncPayload = chromeTabs.map((t) => {
-        let canonical = t.url;
-        try {
-          const u = new URL(t.url);
-          u.hash = '';
-          for (const p of ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'fbclid', 'gclid', 'ref']) {
-            u.searchParams.delete(p);
-          }
-          canonical = u.href.replace(/\/+$/, '');
-        } catch {}
-        const cached = enrichments[canonical];
-        return {
-          url: t.url,
-          title: t.title,
-          favIconUrl: t.favIconUrl,
-          tabId: t.tabId,
-          windowId: t.windowId,
-          // Send persisted enrichments so backend can restore them
-          topic: cached?.topic ?? undefined,
-          tags: cached?.tags ? JSON.stringify(cached.tags) : undefined,
-          ai_summary: cached?.ai_summary ?? undefined,
-          user_score: cached?.user_score ?? undefined,
-        };
-      });
-      await api.tabs.sync(syncPayload);
-      const { tabs } = await api.tabs.list();
-      const parsed = tabs.map((t) => ({
-        ...t,
-        tags: typeof t.tags === 'string' ? JSON.parse(t.tags) : t.tags || [],
-      }));
-
-      // Write back any new enrichments from backend to cache
-      const toSave = parsed
-        .filter(t => t.topic || t.ai_summary || t.user_score)
-        .map(t => ({
-          url: t.url,
-          topic: t.topic,
-          tags: t.tags,
-          ai_summary: t.ai_summary,
-          user_score: t.user_score,
-        }));
-      if (toSave.length) batchSaveEnrichments(toSave).catch(() => {});
-
-      set({ tabs: parsed, isScanning: false });
+      const tabs = buildLocalTabRecords(chromeTabs, enrichments);
+      set({ tabs, isScanning: false });
     } catch (e) {
       set({ error: (e as Error).message, isScanning: false });
     }
   },
 
   fetchTabs: async () => {
-    try {
-      const { tabs } = await api.tabs.list();
-      const parsed = tabs.map((t) => ({
-        ...t,
-        tags: typeof t.tags === 'string' ? JSON.parse(t.tags) : t.tags || [],
-      }));
-      // Persist enrichments
-      const toSave = parsed
-        .filter(t => t.topic || t.ai_summary || t.user_score)
-        .map(t => ({ url: t.url, topic: t.topic, tags: t.tags, ai_summary: t.ai_summary, user_score: t.user_score }));
-      if (toSave.length) batchSaveEnrichments(toSave).catch(() => {});
-      set({ tabs: parsed });
-    } catch (e) {
-      set({ error: (e as Error).message });
-    }
+    /* tabs are in-memory from syncTabs; no backend fetch needed */
   },
 
   setFilter: (filter) => set({ filter }),
@@ -186,12 +177,8 @@ export const useTabStore = create<TabState>((set, get) => ({
   selectAll: () => {
     const state = get();
     const visible = applyFilters(
-      state.tabs,
-      state.filter,
-      state.topicFilter,
-      state.searchQuery,
-      state.sortField,
-      state.sortDirection,
+      state.tabs, state.filter, state.topicFilter,
+      state.searchQuery, state.sortField, state.sortDirection,
     );
     set({ selectedIds: new Set(visible.map((t) => t.id)) });
   },
@@ -202,6 +189,17 @@ export const useTabStore = create<TabState>((set, get) => ({
     set({
       tabs: get().tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     });
+    // Persist enrichments for updated tabs
+    const tab = get().tabs.find(t => t.id === id);
+    if (tab && (updates.topic !== undefined || updates.ai_summary !== undefined || updates.user_score !== undefined || updates.tags !== undefined)) {
+      batchSaveEnrichments([{
+        url: tab.url,
+        topic: tab.topic,
+        tags: tab.tags,
+        ai_summary: tab.ai_summary,
+        user_score: tab.user_score,
+      }]).catch(() => {});
+    }
   },
 
   removeTab: (id) => {

@@ -5,7 +5,7 @@ import { useTabStore } from '../stores/tab-store';
 import { MarkdownPreview } from './MarkdownPreview';
 import { NoteDialog } from './NoteDialog';
 import type { TabRecord } from '@/lib/types';
-import { Plus, Trash2, Send, Loader2, MessageSquare, User, Bot, FileEdit, ExternalLink, ChevronDown, ChevronUp, Wrench, Zap, Command } from 'lucide-react';
+import { Plus, Trash2, Send, Loader2, MessageSquare, User, Bot, FileEdit, ExternalLink, ChevronDown, ChevronUp, Wrench, Zap, Command, Globe, Square } from 'lucide-react';
 import { useSettingsStore } from '../stores/settings-store';
 import { cn } from '@/lib/utils';
 
@@ -25,16 +25,22 @@ function CollapsibleUserMessage({ content }: { content: string }) {
 
 function CollapsibleThinking({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false);
-  const thinkMatch = content.match(/<think>([\s\S]*?)<\/think>/);
-  if (!thinkMatch) return <MarkdownPreview content={content} />;
-  const thinking = thinkMatch[1].trim();
-  const rest = content.replace(/<think>[\s\S]*?<\/think>/, '').trim();
+  const thinkBlocks: string[] = [];
+  const regex = /<think>([\s\S]*?)<\/think>/g;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(content)) !== null) {
+    if (m[1].trim()) thinkBlocks.push(m[1].trim());
+  }
+  if (!thinkBlocks.length) return <MarkdownPreview content={content} />;
+  const allThinking = thinkBlocks.join('\n\n---\n\n');
+  const rest = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
   return (
     <div>
       <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-muted-foreground mb-1">
-        {expanded ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />} 💭 思考过程
+        {expanded ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
+        思考过程{thinkBlocks.length > 1 ? ` (${thinkBlocks.length})` : ''}
       </button>
-      {expanded && <div className="mb-2 pl-2 border-l-2 border-muted text-[11px] text-muted-foreground/70"><MarkdownPreview content={thinking} /></div>}
+      {expanded && <div className="mb-2 pl-2 border-l-2 border-muted text-[11px] text-muted-foreground/70"><MarkdownPreview content={allThinking} /></div>}
       {rest && <MarkdownPreview content={rest} />}
     </div>
   );
@@ -42,19 +48,21 @@ function CollapsibleThinking({ content }: { content: string }) {
 
 function ToolCallCard({ name, display, status, collapsed, onToggle }: { name: string; display?: string; status: 'calling' | 'done'; collapsed?: boolean; onToggle?: () => void }) {
   const toolLabels: Record<string, string> = {
-    search_tabs: '🔍 搜索标签',
-    list_tabs_summary: '📊 标签概况',
-    save_note: '💾 保存笔记',
-    close_tabs: '🗑️ 关闭标签',
-    classify_tab: '🏷️ 分类标签',
-    get_tab_detail: '📑 查看详情',
+    search_tabs: '搜索标签',
+    list_tabs_summary: '标签概况',
+    save_note: '保存笔记',
+    close_tabs: '关闭标签',
+    classify_tab: '分类标签',
+    get_tab_detail: '查看详情',
+    get_page_content: '获取页面内容',
+    detect_duplicates: '重复检测',
   };
   return (
     <div className="rounded-md bg-muted/30 border border-border/30 text-[10px] overflow-hidden">
       <button onClick={onToggle} className="w-full flex items-center gap-2 px-2 py-1 hover:bg-muted/50 transition-colors">
         {status === 'calling' ? <Loader2 className="h-2.5 w-2.5 animate-spin text-primary shrink-0" /> : <Wrench className="h-2.5 w-2.5 text-muted-foreground shrink-0" />}
-        <span className="font-medium text-muted-foreground">{toolLabels[name] || name}</span>
-        {status === 'done' && <span className="text-muted-foreground/60 truncate flex-1 text-left">✓</span>}
+        <span className="font-medium text-muted-foreground shrink-0">{toolLabels[name] || name}</span>
+        {status === 'done' && collapsed && <span className="text-muted-foreground/60 truncate flex-1 text-left">{display || 'done'}</span>}
         {collapsed !== undefined && (collapsed ? <ChevronDown className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" /> : <ChevronUp className="h-2.5 w-2.5 text-muted-foreground/50 shrink-0" />)}
       </button>
       {!collapsed && display && (
@@ -64,10 +72,45 @@ function ToolCallCard({ name, display, status, collapsed, onToggle }: { name: st
   );
 }
 
+function ModelSelector() {
+  const { providers, activeProviderId, activeModel, setActiveProvider, setActiveModel } = useSettingsStore();
+  const [open, setOpen] = useState(false);
+  const activeProvider = providers.find(p => p.id === activeProviderId);
+  if (!providers.length) return <span className="text-[10px] text-muted-foreground/50">未配置模型</span>;
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted border border-transparent hover:border-border transition-colors max-w-[160px]">
+        <span className="truncate">{activeModel || '选择模型'}</span>
+        <ChevronDown className="h-2.5 w-2.5 shrink-0" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-0 mb-1 z-40 min-w-[180px] max-w-[260px] bg-background border border-border rounded-lg shadow-lg py-1 max-h-60 overflow-auto">
+            {providers.map(p => (
+              <div key={p.id}>
+                <div className="px-2 py-1 text-[9px] font-medium text-muted-foreground/60 uppercase tracking-wide">{p.name}</div>
+                {p.models.map(m => (
+                  <button key={m} onClick={() => { setActiveProvider(p.id, m); setOpen(false); }}
+                    className={cn('w-full text-left px-3 py-1 text-[11px] hover:bg-muted/50 transition-colors flex items-center gap-1.5',
+                      p.id === activeProviderId && m === activeModel && 'text-primary bg-primary/5')}>
+                    {p.id === activeProviderId && m === activeModel && <span className="h-1 w-1 rounded-full bg-primary shrink-0" />}
+                    <span className="truncate">{m}</span>
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function ChatPanel() {
   const {
-    sessions, activeSessionId, isStreaming, agentMode,
-    createSession, selectSession, deleteSession, sendMessage, toggleAgentMode,
+    sessions, activeSessionId, isStreaming, agentMode, pageContext,
+    createSession, selectSession, deleteSession, sendMessage, stopStreaming, setAgentMode, setPageContext,
   } = useChatStore();
   const { pendingSummarizeTabId, clearPendingSummarize } = useNavStore();
   const tabs = useTabStore(s => s.tabs);
@@ -78,14 +121,24 @@ export function ChatPanel() {
   const [noteTab, setNoteTab] = useState<TabRecord | null>(null);
   const [contextTabId, setContextTabId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const isNearBottomRef = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const quickPrompts = useSettingsStore(s => s.quickPrompts);
 
   const activeSession = sessions.find(s => s.id === activeSessionId) || null;
   const contextTab = contextTabId ? tabs.find(t => t.id === contextTabId) : null;
 
+  const handleScroll = () => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    isNearBottomRef.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 60;
+  };
+
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isNearBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [activeSession?.messages.length, activeSession?.messages[activeSession.messages.length - 1]?.content]);
 
   useEffect(() => {
@@ -104,63 +157,112 @@ export function ChatPanel() {
   }, []);
 
   const handleSummarizeTab = async (tab: typeof tabs[0]) => {
+    if (!useSettingsStore.getState().isAIConfigured()) {
+      createSession();
+      setTimeout(() => sendMessage('请先在设置中配置 AI 服务商。'), 100);
+      return;
+    }
+
+    if (isStreaming) stopStreaming();
+
     let contentText = tab.content_text || '';
     if (!contentText && tab.source_tab_id) {
       try {
         const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId: tab.source_tab_id });
         if (htmlResult?.html) {
-          const { api } = await import('@/lib/api');
-          const extracted = await api.content.extract({ html: htmlResult.html, url: tab.url, extractor: 'readability' });
+          const { extractFromHTML } = await import('@/lib/content-extractor');
+          const extracted = extractFromHTML(htmlResult.html, tab.url, 'readability');
           contentText = extracted.plainText || extracted.markdown || '';
-          if (contentText) {
-            await api.tabs.update(tab.id, { content_text: contentText.substring(0, 50000) } as any);
-          }
         }
       } catch {
         try {
           const result = await chrome.runtime.sendMessage({ type: 'EXTRACT_CONTENT', tabId: tab.source_tab_id });
-          if (result?.content_text) {
-            contentText = result.content_text;
-            const { api } = await import('@/lib/api');
-            await api.tabs.update(tab.id, { content_text: contentText } as any);
-          }
+          if (result?.content_text) contentText = result.content_text;
         } catch {}
       }
     }
-    const prompt = `请总结这个网页：\n标题：${tab.title}\nURL：${tab.url}\n域名：${tab.domain}${contentText ? `\n\n内容：\n${contentText.substring(0, 6000)}` : '\n\n（无法获取页面正文，请根据标题和URL进行分析）'}`;
-    createSession();
-    setTimeout(() => sendMessage(prompt), 100);
+
+    const sessionId = createSession();
+    useChatStore.setState(state => ({
+      sessions: state.sessions.map(s =>
+        s.id === sessionId ? { ...s, title: `摘要: ${tab.title.substring(0, 20)}` } : s
+      ),
+    }));
+
+    setPageContext({
+      title: tab.title,
+      url: tab.url,
+      domain: tab.domain,
+      favicon: tab.favicon_url,
+      contentExcerpt: contentText.substring(0, 6000),
+    });
+
+    await sendMessage('总结当前页面的核心内容');
   };
 
   const handleSend = async () => {
     if (!input.trim() || isStreaming) return;
-    let msg = input;
+    const msg = input;
     setInput('');
-    if (activePageContext && activeSession && activeSession.messages.length === 0) {
-      msg = `[当前页面] ${activePageContext.title}\n${activePageContext.url}\n\n${msg}`;
-      setActivePageContext(null);
-    }
     await sendMessage(msg);
   };
-
-  const [activePageContext, setActivePageContext] = useState<{ title: string; url: string; domain: string; favicon?: string } | null>(null);
 
   const detectActivePage = async () => {
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab?.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('chrome-extension://')) {
         const domain = new URL(tab.url).hostname.replace('www.', '');
-        setActivePageContext({ title: tab.title || '', url: tab.url, domain, favicon: tab.favIconUrl });
+        const ctx = { title: tab.title || '', url: tab.url, domain, favicon: tab.favIconUrl };
+        setPageContext(ctx);
+
+        if (tab.id) {
+          extractPageContentForContext(tab.id, tab.url, ctx);
+        }
       } else {
-        setActivePageContext(null);
+        setPageContext(null);
       }
     } catch {
-      setActivePageContext(null);
+      setPageContext(null);
     }
   };
 
+  const extractPageContentForContext = async (
+    tabId: number,
+    url: string,
+    ctx: Parameters<typeof setPageContext>[0] & {},
+  ) => {
+    const guard = () => {
+      const cur = useChatStore.getState().pageContext;
+      return cur?.url === ctx.url;
+    };
+
+    try {
+      const result = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_CONTENT_CS' });
+      if (result?.content_text && guard()) {
+        setPageContext({ ...ctx, contentExcerpt: result.content_text.substring(0, 3000) });
+        return;
+      }
+    } catch { /* content script not ready */ }
+
+    if (!guard()) return;
+
+    try {
+      const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId });
+      if (htmlResult?.html && guard()) {
+        const { extractFromHTML } = await import('@/lib/content-extractor');
+        const extracted = extractFromHTML(htmlResult.html, url, 'readability');
+        const text = extracted.plainText || '';
+        if (text) {
+          setPageContext({ ...ctx, contentExcerpt: text.substring(0, 3000) });
+        }
+      }
+    } catch { /* extraction failed, metadata-only fallback */ }
+  };
+
   const handleNewChat = () => {
+    if (isStreaming) stopStreaming();
     createSession();
+    setContextTabId(null);
     setShowSidebar(false);
     detectActivePage();
     inputRef.current?.focus();
@@ -183,7 +285,6 @@ export function ChatPanel() {
     }));
   };
 
-  // Group consecutive non-user messages into agent response blocks
   interface MsgGroup {
     type: 'user' | 'agent';
     messages: Array<{ msg: ChatMessage; idx: number }>;
@@ -228,7 +329,6 @@ export function ChatPanel() {
     const isLastGroup = key === groupedMessages.length - 1;
     const showThinking = isStreaming && isLastGroup && hasEmptyAssistant && !textEntries.length;
 
-    // Skip entirely empty groups when not streaming
     if (!showThinking && !toolEntries.length && !textEntries.length) return null;
 
     return (
@@ -246,27 +346,41 @@ export function ChatPanel() {
           )}
           {toolEntries.length > 0 && (
             <div className="space-y-0.5">
-              {toolEntries.map(({ msg, idx }) => (
-                <ToolCallCard
-                  key={idx}
-                  name={msg.toolName || ''}
-                  display={msg.role === 'tool_result' ? msg.content : undefined}
-                  status={msg.role === 'tool_call' ? 'calling' : 'done'}
-                  collapsed={msg.collapsed}
-                  onToggle={() => toggleToolCollapse(idx)}
-                />
-              ))}
+              {toolEntries.map(({ msg, idx }) => {
+                if (msg.role === 'tool_call') {
+                  const hasResult = group.messages.some(
+                    e => e.msg.role === 'tool_result' && e.msg.toolCallId === msg.toolCallId,
+                  );
+                  if (hasResult) return null;
+                }
+                return (
+                  <ToolCallCard
+                    key={idx}
+                    name={msg.toolName || ''}
+                    display={msg.role === 'tool_result' ? msg.content : undefined}
+                    status={msg.role === 'tool_call' ? 'calling' : 'done'}
+                    collapsed={msg.collapsed}
+                    onToggle={() => toggleToolCollapse(idx)}
+                  />
+                );
+              })}
             </div>
           )}
-          {textEntries.map(({ msg, idx }) => (
-            <div key={idx} className="rounded-lg px-2.5 py-1.5 bg-muted/50 border border-border/50">
-              <CollapsibleThinking content={msg.content} />
-            </div>
-          ))}
+          {textEntries.map(({ msg, idx }) => {
+            const isLastText = idx === textEntries[textEntries.length - 1].idx;
+            const showCursor = isStreaming && isLastGroup && isLastText;
+            return (
+              <div key={idx} className="rounded-lg px-2.5 py-1.5 bg-muted/50 border border-border/50">
+                <CollapsibleThinking content={showCursor ? `${msg.content}▍` : msg.content} />
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   };
+
+  const aiConfigured = useSettingsStore(s => s.isAIConfigured());
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -308,52 +422,53 @@ export function ChatPanel() {
           <MessageSquare className="h-4 w-4" />
         </button>
         <span className="text-xs font-medium truncate flex-1">{activeSession?.title || '新对话'}</span>
-        <button
-          onClick={() => toggleAgentMode()}
-          className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] transition-colors', agentMode ? 'bg-amber-100 text-amber-700 font-medium' : 'text-muted-foreground hover:bg-muted')}
-          title={agentMode ? 'Agent 模式（可执行工具）' : '普通聊天模式'}
-        >
-          <Zap className="h-3 w-3" />
-          {agentMode ? 'Agent' : '普通'}
-        </button>
+        {pageContext && (
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/50 text-[9px] text-muted-foreground max-w-[120px]" title={`当前页面上下文已注入: ${pageContext.title}`}>
+            <Globe className="h-2.5 w-2.5 shrink-0 text-primary/60" />
+            <span className="truncate">{pageContext.domain}</span>
+            <button onClick={() => setPageContext(null)} className="shrink-0 hover:text-foreground">&times;</button>
+          </div>
+        )}
         <button onClick={handleNewChat} className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-primary/10 text-primary hover:bg-primary/20">
           <Plus className="h-3 w-3" /> 新对话
         </button>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-auto px-3 py-2 space-y-3">
+      <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-auto px-3 py-2 space-y-3">
         {(!activeSession || activeSession.messages.length === 0) && (
           <div className="flex flex-col items-center justify-center h-full text-center px-2">
             <Bot className="h-8 w-8 text-muted-foreground/30 mb-2" />
-            <p className="text-xs text-muted-foreground/50 mt-1">
-              {agentMode ? '🤖 Agent 可以直接搜索、分类、导出、关闭你的标签' : '💬 随时问我关于标签和页面内容的问题'}
-            </p>
-            {activePageContext && (
+            {!aiConfigured ? (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                请先在设置中配置 AI 服务商
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground/50 mt-1">
+                {agentMode
+                  ? 'Agent 模式 — 可以搜索、关闭、分类标签'
+                  : '随时问我关于标签和页面内容的问题'}
+              </p>
+            )}
+            {pageContext && (
               <div className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/5 border border-primary/10 text-left max-w-[90%]">
-                {activePageContext.favicon && <img src={activePageContext.favicon} className="h-3.5 w-3.5 rounded-sm shrink-0" alt="" />}
+                <Globe className="h-3 w-3 shrink-0 text-primary/50" />
+                {pageContext.favicon && <img src={pageContext.favicon} className="h-3.5 w-3.5 rounded-sm shrink-0" alt="" />}
                 <div className="min-w-0">
-                  <div className="text-[10px] text-muted-foreground truncate">{activePageContext.title}</div>
-                  <div className="text-[9px] text-muted-foreground/50 truncate">{activePageContext.domain}</div>
+                  <div className="text-[10px] text-muted-foreground truncate">{pageContext.title}</div>
+                  <div className="text-[9px] text-muted-foreground/50 truncate">{pageContext.domain}</div>
                 </div>
-                <button onClick={() => setActivePageContext(null)} className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground text-[10px] ml-1">&times;</button>
+                <span className="text-[9px] text-primary/60 shrink-0 ml-1">已注入上下文</span>
+                <button onClick={() => setPageContext(null)} className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground text-[10px] ml-1">&times;</button>
               </div>
             )}
             <div className="mt-4 space-y-1 w-full max-w-[280px]">
-              {(agentMode
-                ? [
-                    { icon: '📊', text: '分析一下我的标签分布' },
-                    { icon: '🗂️', text: '把所有 AI 相关标签导出到笔记' },
-                    { icon: '🧹', text: '关掉超过一周没看的标签' },
-                    { icon: '🔍', text: '搜索所有 GitHub 相关的标签' },
-                  ]
-                : [
-                    { icon: '📝', text: '总结当前页面的核心内容' },
-                    { icon: '🏷️', text: '我的标签有哪些分类？' },
-                    { icon: '🔄', text: '有哪些重复标签可以清理？' },
-                    { icon: '💡', text: '推荐我应该优先阅读哪些标签' },
-                  ]
-              ).map(q => (
+              {[
+                { icon: '📝', text: '总结当前页面的核心内容' },
+                { icon: '🏷️', text: '我的标签有哪些分类？' },
+                { icon: '🔄', text: '有哪些重复标签可以清理？' },
+                { icon: '💡', text: '推荐我应该优先阅读哪些标签' },
+              ].map(q => (
                 <button key={q.text} onClick={() => setInput(q.text)} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left rounded-lg border border-border/60 hover:bg-muted/50 hover:border-primary/30 transition-colors">
                   <span>{q.icon}</span>
                   <span className="text-muted-foreground">{q.text}</span>
@@ -396,29 +511,46 @@ export function ChatPanel() {
             ))}
           </div>
         )}
-        <div className="flex gap-1.5 items-end">
+        <div className="flex gap-1 items-center text-[10px]">
+          <button
+            onClick={() => setAgentMode(!agentMode)}
+            className={cn(
+              'flex items-center gap-0.5 px-1.5 py-0.5 rounded transition-colors shrink-0',
+              agentMode
+                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30'
+                : 'text-muted-foreground hover:bg-muted border border-transparent',
+            )}
+            title={agentMode ? 'Agent 模式 ON' : 'Agent 模式 OFF'}
+          >
+            <Zap className="h-2.5 w-2.5" />Agent
+          </button>
+          <ModelSelector />
           {quickPrompts.length > 0 && (
-            <button onClick={() => setShowQuickPrompts(!showQuickPrompts)} className={cn('shrink-0 h-8 w-8 rounded-lg flex items-center justify-center transition-colors', showQuickPrompts ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')} title="快捷指令">
-              <Command className="h-3.5 w-3.5" />
+            <button onClick={() => setShowQuickPrompts(!showQuickPrompts)} className={cn('shrink-0 px-1.5 py-0.5 rounded transition-colors', showQuickPrompts ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')} title="快捷指令">
+              <Command className="h-2.5 w-2.5" />
             </button>
           )}
+        </div>
+        <div className="flex gap-1.5 items-end">
           <textarea
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={agentMode ? '让 Agent 帮你操作... (Shift+Enter 换行)' : '输入消息... (Shift+Enter 换行)'}
-            disabled={isStreaming}
+            placeholder={aiConfigured ? '输入消息... (Shift+Enter 换行)' : '请先配置 AI 服务商...'}
+            disabled={isStreaming || !aiConfigured}
             rows={input.split('\n').length > 3 ? 4 : input.includes('\n') ? 2 : 1}
             className="flex-1 min-h-[32px] max-h-24 px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"
           />
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-            className="shrink-0 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs disabled:opacity-50 flex items-center gap-1"
-          >
-            {isStreaming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-          </button>
+          {isStreaming ? (
+            <button onClick={stopStreaming} className="shrink-0 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs flex items-center gap-1 hover:bg-primary/90" title="停止生成">
+              <Square className="h-3 w-3 fill-current" />
+            </button>
+          ) : (
+            <button onClick={handleSend} disabled={!input.trim() || !aiConfigured} className="shrink-0 h-8 px-3 rounded-lg bg-primary text-primary-foreground text-xs disabled:opacity-50 flex items-center gap-1">
+              <Send className="h-3 w-3" />
+            </button>
+          )}
         </div>
       </div>
 

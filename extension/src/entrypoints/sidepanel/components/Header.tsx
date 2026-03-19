@@ -3,7 +3,7 @@ import { useTabStore } from '../stores/tab-store';
 import { useAIStore } from '../stores/ai-store';
 import { useNavStore, type Panel } from '../stores/nav-store';
 import { useSettingsStore } from '../stores/settings-store';
-import { api } from '@/lib/api';
+import { detectDuplicates } from '@/lib/duplicate-detector';
 import type { SyncedTab } from '@/lib/types';
 import type { TabViewMode } from '../App';
 import { RefreshCw, Sparkles, Copy, Loader2, Settings, Sun, Moon, Monitor } from 'lucide-react';
@@ -17,7 +17,7 @@ interface HeaderProps {
 export function Header({ viewMode, onViewModeChange }: HeaderProps) {
   const { activePanel, setActivePanel, toggleSettings } = useNavStore();
   const { isScanning, syncTabs, tabs, setDuplicateGroups, duplicateGroups } = useTabStore();
-  const { isClassifying, classifyProgress, startClassify } = useAIStore();
+  const { isClassifying, classifyProgress, startClassify, stopClassify } = useAIStore();
   const { theme, setTheme } = useSettingsStore();
   const [detectingDups, setDetectingDups] = useState(false);
 
@@ -39,13 +39,13 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
     await syncTabs(syncedTabs);
   };
 
-  const handleDetectDups = async () => {
+  const handleDetectDups = () => {
     if (viewMode === 'duplicates') { onViewModeChange('list'); return; }
     setDetectingDups(true);
     try {
-      const result = await api.duplicates.detect();
-      setDuplicateGroups(result.groups);
-      if (result.totalGroups > 0) onViewModeChange('duplicates');
+      const groups = detectDuplicates(tabs);
+      setDuplicateGroups(groups);
+      if (groups.length > 0) onViewModeChange('duplicates');
     } catch {}
     setDetectingDups(false);
   };
@@ -86,15 +86,15 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
           {activePanel === 'tabs' && (
             <>
               <button
-                onClick={() => startClassify()}
-                disabled={isClassifying || tabs.length === 0}
+                onClick={() => isClassifying ? stopClassify() : startClassify()}
+                disabled={!isClassifying && tabs.length === 0}
                 className={cn(
                   'flex items-center gap-0.5 px-1.5 py-1 text-[11px] rounded-md transition-colors',
                   isClassifying ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-primary/10 text-primary hover:bg-primary/20',
                 )}
               >
                 <Sparkles className="h-3 w-3 shrink-0" />
-                {isClassifying ? `${classifyProgress?.stageName || '...'}` : '分类'}
+                {isClassifying ? '停止' : '分类'}
               </button>
 
               <button

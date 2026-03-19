@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { api, fetchSSE } from '@/lib/api';
+import { api } from '@/lib/api';
 import { extractFromHTML, type PageContent, type ExtractorType } from '@/lib/content-extractor';
+import { streamNoteOptimize } from '@/lib/ai-chat';
 import { useTabStore } from '../stores/tab-store';
 import { useSettingsStore } from '../stores/settings-store';
+import { getBackendAvailable } from '@/lib/backend-status';
 import { MarkdownPreview } from './MarkdownPreview';
 import { ScoreRating } from './ScoreRating';
 import type { TabRecord, ExportTarget } from '@/lib/types';
@@ -22,6 +24,7 @@ interface NoteDialogProps {
 export function NoteDialog({ tab, onClose }: NoteDialogProps) {
   const settings = useSettingsStore();
   const { fetchTabs } = useTabStore();
+  const backendAvailable = getBackendAvailable();
 
   const [target, setTarget] = useState<ExportTarget>(settings.defaultExportTarget);
   const [folder, setFolder] = useState(tab.topic ? `${settings.defaultFolder}/${tab.topic}` : settings.defaultFolder);
@@ -49,11 +52,12 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
   const tags = Array.isArray(tab.tags) ? tab.tags : [];
 
   useEffect(() => {
+    if (!backendAvailable) return;
     const load = target === 'apple_notes'
       ? api.export.appleNotesFolders().then(r => setFolders(r.folders.map((f: any) => f.name)))
       : api.export.obsidianFolders().then(r => setFolders(r.folders));
     load.catch(() => {});
-  }, [target]);
+  }, [target, backendAvailable]);
 
   useEffect(() => {
     if (!tab.source_tab_id) return;
@@ -119,31 +123,22 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
 
   const handleAIOptimize = async () => {
     if (!aiInput.trim() || aiStreaming) return;
+    if (!settings.isAIConfigured()) return;
+
     const prompt = aiInput;
     setAiInput('');
     setAiStreaming(true);
 
-    const context = [
-      `网页：${tab.title}`,
-      `URL：${tab.url}`,
-      tab.topic ? `分类：${tab.topic}` : '',
-      tags.length ? `标签：${tags.join(', ')}` : '',
-      tab.user_score ? `评分：${tab.user_score}/10` : '',
-      `\n${noteStylePrompt()}`,
-      `\n当前笔记内容：\n${markdown.substring(0, 12000)}`,
-      `\n---\n指令：${prompt}`,
-    ].filter(Boolean).join('\n');
-
     try {
       let out = '';
-      for await (const msg of fetchSSE('/api/ai/chat', {
-        messages: [
-          { role: 'system', content: `你是笔记整理助手。输出干净的 Markdown。\n写作要求：像人类笔记者书写，简洁直接，禁止"综上所述""总的来说""值得注意的是"等AI套话。不要用"本文""该文章"等指代。\n只输出笔记内容，不要输出元数据。\n${noteStylePrompt()}` },
-          { role: 'user', content: context },
-        ],
-        model: settings.selectedModel || undefined,
-      })) {
-        if (msg.type === 'chunk') out += msg.content as string;
+      const config = settings.getAIConfig();
+      for await (const chunk of streamNoteOptimize(
+        prompt, markdown,
+        { title: tab.title, url: tab.url, topic: tab.topic, tags },
+        config,
+        { stylePrompt: noteStylePrompt() },
+      )) {
+        out += chunk;
       }
       if (out) {
         setMarkdown(out);
@@ -157,17 +152,23 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
   };
 
   const handleExport = async () => {
+    if (!backendAvailable) {
+      handleDownloadMD();
+      return;
+    }
     setExporting(true);
     setResult(null);
     try {
-      const r = await api.export.single(tab.id, {
+      const r = await api.export.single({
+        title: tab.title,
+        url: tab.url,
+        domain: tab.domain,
+        topic: tab.topic || undefined,
+        tags: tab.tags,
+        userScore: tab.user_score || undefined,
+        content: markdown,
         target,
-        depth: 'standard',
         folder,
-        model: settings.selectedModel || undefined,
-        editedContent: markdown,
-        extractor,
-        imageUrls: pageContent?.images,
       });
       setResult({ success: r.success, error: r.error });
       if (r.success) {
@@ -201,7 +202,7 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
     tab.domain && { icon: <Link className="h-2.5 w-2.5" />, text: tab.domain },
     tab.topic && { icon: <FolderOpen className="h-2.5 w-2.5" />, text: tab.topic },
     tags.length > 0 && { icon: <Tag className="h-2.5 w-2.5" />, text: tags.slice(0, 3).map(t => `#${t}`).join(' ') },
-    tab.user_score && { icon: null, text: `⭐ ${tab.user_score}/10` },
+    tab.user_score && { icon: null, text: `${tab.user_score}/10` },
     pageContent && { icon: null, text: `${pageContent.wordCount} 字 · ${pageContent.extractedBy}` },
   ].filter(Boolean) as Array<{ icon: React.ReactNode; text: string }>;
 
@@ -221,12 +222,14 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
 
       <div className="flex-1 overflow-auto px-4 py-3 space-y-4">
         {/* Export Target */}
-        <section className="space-y-2">
-          <div className="flex gap-2">
-            <button onClick={() => setTarget('apple_notes')} className={cn('flex-1 h-9 rounded-lg border text-xs font-medium transition-all', target === 'apple_notes' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border hover:bg-muted')}>🍎 Apple Notes</button>
-            <button onClick={() => setTarget('obsidian')} className={cn('flex-1 h-9 rounded-lg border text-xs font-medium transition-all', target === 'obsidian' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border hover:bg-muted')}>💎 Obsidian</button>
-          </div>
-        </section>
+        {backendAvailable && (
+          <section className="space-y-2">
+            <div className="flex gap-2">
+              <button onClick={() => setTarget('apple_notes')} className={cn('flex-1 h-9 rounded-lg border text-xs font-medium transition-all', target === 'apple_notes' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border hover:bg-muted')}>🍎 Apple Notes</button>
+              <button onClick={() => setTarget('obsidian')} className={cn('flex-1 h-9 rounded-lg border text-xs font-medium transition-all', target === 'obsidian' ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-border hover:bg-muted')}>💎 Obsidian</button>
+            </div>
+          </section>
+        )}
 
         {/* Settings Row */}
         <section className="grid grid-cols-2 gap-3">
@@ -303,6 +306,9 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
           </button>
           {showAI && (
             <div className="space-y-2 p-3 rounded-lg bg-muted/20 border border-border/60">
+              {!settings.isAIConfigured() && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">请先在设置中配置 AI API Key</p>
+              )}
               {settings.quickPrompts.length > 0 && (
                 <div className="flex gap-1.5 flex-wrap">
                   {settings.quickPrompts.map(p => (
@@ -313,8 +319,8 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
                 </div>
               )}
               <div className="flex gap-2">
-                <input type="text" value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAIOptimize()} placeholder="自定义优化指令..." disabled={aiStreaming} className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
-                <button onClick={handleAIOptimize} disabled={!aiInput.trim() || aiStreaming} className="px-3 h-8 rounded-lg bg-primary text-primary-foreground text-xs disabled:opacity-50 flex items-center gap-1.5 shrink-0">
+                <input type="text" value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAIOptimize()} placeholder="自定义优化指令..." disabled={aiStreaming || !settings.isAIConfigured()} className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                <button onClick={handleAIOptimize} disabled={!aiInput.trim() || aiStreaming || !settings.isAIConfigured()} className="px-3 h-8 rounded-lg bg-primary text-primary-foreground text-xs disabled:opacity-50 flex items-center gap-1.5 shrink-0">
                   {aiStreaming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
                   优化
                 </button>
@@ -329,12 +335,14 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         </section>
 
         {/* Options */}
-        <section>
-          <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none">
-            <input type="checkbox" checked={closeAfterExport} onChange={e => setCloseAfterExport(e.target.checked)} className="h-3.5 w-3.5 accent-primary rounded" />
-            导出后关闭此标签页
-          </label>
-        </section>
+        {backendAvailable && (
+          <section>
+            <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none">
+              <input type="checkbox" checked={closeAfterExport} onChange={e => setCloseAfterExport(e.target.checked)} className="h-3.5 w-3.5 accent-primary rounded" />
+              导出后关闭此标签页
+            </label>
+          </section>
+        )}
 
         {/* Result */}
         {result && (
@@ -350,9 +358,15 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         <button onClick={handleDownloadMD} disabled={!markdown} className="h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted disabled:opacity-50 flex items-center gap-1.5 shrink-0" title="下载 Markdown 文件">
           <FileDown className="h-3.5 w-3.5" /> .md
         </button>
-        <button onClick={handleExport} disabled={exporting || isExported} className={cn('flex-1 h-9 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all', isExported ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50')}>
-          {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : isExported ? <><CheckCircle className="h-4 w-4" /> 已保存</> : <><Download className="h-4 w-4" /> {result?.success ? '重新保存' : '保存为笔记'}</>}
-        </button>
+        {backendAvailable ? (
+          <button onClick={handleExport} disabled={exporting || isExported} className={cn('flex-1 h-9 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all', isExported ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50')}>
+            {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : isExported ? <><CheckCircle className="h-4 w-4" /> 已保存</> : <><Download className="h-4 w-4" /> {result?.success ? '重新保存' : '导出笔记'}</>}
+          </button>
+        ) : (
+          <button onClick={handleDownloadMD} disabled={!markdown} className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
+            <FileDown className="h-4 w-4" /> 下载 Markdown
+          </button>
+        )}
       </div>
     </div>,
     document.body,

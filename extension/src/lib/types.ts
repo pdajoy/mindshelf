@@ -64,7 +64,7 @@ export interface DuplicateGroupResult {
   reason: string;
 }
 
-export type SortField = 'title' | 'domain' | 'scanned_at' | 'topic';
+export type SortField = 'title' | 'domain' | 'scanned_at' | 'topic' | 'user_score';
 export type SortDirection = 'asc' | 'desc';
 export type TabFilter = 'all' | 'processed' | 'unprocessed';
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { fetchSSE } from '@/lib/api';
+import { streamChatMessage, type PageContext, type ChatStreamEvent } from '@/lib/ai-chat';
 import { useSettingsStore } from './settings-store';
 
 export interface ChatMessage {
@@ -24,16 +24,45 @@ interface ChatState {
   activeSessionId: string | null;
   isStreaming: boolean;
   agentMode: boolean;
+  pageContext: PageContext | null;
 
   createSession: () => string;
   selectSession: (id: string) => void;
   deleteSession: (id: string) => void;
   sendMessage: (content: string) => Promise<void>;
+  stopStreaming: () => void;
   getActiveSession: () => ChatSession | null;
-  toggleAgentMode: () => void;
+  setAgentMode: (on: boolean) => void;
+  setPageContext: (ctx: PageContext | null) => void;
 }
 
 const CHAT_STORAGE_KEY = 'mindshelf_chat_sessions';
+const AGENT_MODE_KEY = 'mindshelf_agent_mode';
+
+function formatAIError(err: unknown): string {
+  if (!(err instanceof Error)) return `Error: ${String(err)}`;
+  const e = err as Error & {
+    statusCode?: number;
+    url?: string;
+    responseBody?: string;
+    cause?: unknown;
+  };
+  const parts = [`**Error:** ${e.message}`];
+  if (e.statusCode) parts.push(`Status: ${e.statusCode}`);
+  if (e.url) parts.push(`URL: ${e.url}`);
+  if (e.responseBody) {
+    const body = e.responseBody.length > 500
+      ? e.responseBody.substring(0, 500) + '...'
+      : e.responseBody;
+    parts.push(`Response: ${body}`);
+  }
+  if (e.cause instanceof Error) {
+    parts.push(`Cause: ${e.cause.message}`);
+  }
+  return parts.join('\n');
+}
+
+let activeAbortController: AbortController | null = null;
 
 function saveSessions(sessions: ChatSession[]) {
   try {
@@ -45,21 +74,12 @@ function saveSessions(sessions: ChatSession[]) {
   } catch {}
 }
 
-function executeSideEffect(msg: Record<string, unknown>) {
-  if (msg.action === 'close_chrome_tabs' && Array.isArray(msg.chromeTabIds)) {
-    for (const tabId of msg.chromeTabIds) {
-      if (typeof tabId === 'number' && tabId > 0) {
-        chrome.runtime.sendMessage({ type: 'CLOSE_TAB', tabId }).catch(() => {});
-      }
-    }
-  }
-}
-
 export const useChatStore = create<ChatState>((set, get) => ({
   sessions: [],
   activeSessionId: null,
   isStreaming: false,
-  agentMode: true,
+  agentMode: false,
+  pageContext: null,
 
   createSession: () => {
     const id = crypto.randomUUID();
@@ -79,7 +99,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     saveSessions(sessions);
   },
 
-  toggleAgentMode: () => set(s => ({ agentMode: !s.agentMode })),
+  setAgentMode: (on) => {
+    set({ agentMode: on });
+    chrome.storage.local.set({ [AGENT_MODE_KEY]: on }).catch(() => {});
+  },
+
+  setPageContext: (ctx) => set({ pageContext: ctx }),
+
+  stopStreaming: () => {
+    if (activeAbortController) {
+      activeAbortController.abort();
+      activeAbortController = null;
+    }
+  },
 
   sendMessage: async (content) => {
     let sessionId = get().activeSessionId;
@@ -101,68 +133,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
 
     try {
-      const model = useSettingsStore.getState().selectedModel;
+      const settings = useSettingsStore.getState();
+      if (!settings.isAIConfigured()) {
+        appendToAssistant(sessionId!, '请先在设置中配置 AI 服务商和模型。');
+        return;
+      }
+
+      const config = settings.getAIConfig();
       const session = get().sessions.find(s => s.id === sessionId);
       const history = session?.messages
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .slice(0, -1)
         .map(m => ({ role: m.role, content: m.content })) || [];
 
+      const pageContext = get().pageContext;
       const agentMode = get().agentMode;
+      const maxSteps = settings.maxAgentSteps;
 
-      for await (const msg of fetchSSE('/api/ai/chat', {
-        messages: history,
-        model: model || undefined,
-        agent: agentMode,
-      })) {
-        if (msg.type === 'chunk') {
-          appendToAssistant(sessionId!, msg.content as string);
-        } else if (msg.type === 'tool_call') {
-          set(state => ({
-            sessions: state.sessions.map(s =>
-              s.id === sessionId ? {
-                ...s,
-                messages: [...s.messages, {
-                  role: 'tool_call' as const,
-                  content: '',
-                  timestamp: Date.now(),
-                  toolName: msg.name as string,
-                  toolCallId: msg.toolCallId as string,
-                  collapsed: true,
-                }],
-              } : s
-            ),
-          }));
-        } else if (msg.type === 'tool_result') {
-          executeSideEffect(msg);
-          set(state => ({
-            sessions: state.sessions.map(s =>
-              s.id === sessionId ? {
-                ...s,
-                messages: s.messages.map(m =>
-                  m.role === 'tool_call' && m.toolCallId === msg.toolCallId
-                    ? {
-                        role: 'tool_result' as const,
-                        content: msg.display as string,
-                        timestamp: Date.now(),
-                        toolName: msg.name as string,
-                        toolCallId: msg.toolCallId as string,
-                        collapsed: true,
-                      }
-                    : m
-                ),
-              } : s
-            ),
-          }));
-        } else if (msg.type === 'done') {
-          // stream ended after tool use without final text
-        }
+      activeAbortController = new AbortController();
+      for await (const event of streamChatMessage(history, config, { pageContext, agentMode, abortSignal: activeAbortController.signal, maxSteps })) {
+        handleStreamEvent(sessionId!, event);
       }
-    } catch (err) {
-      const errText = `Error: ${(err as Error).message}`;
-      appendToAssistant(sessionId!, errText);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        // User stopped generation — don't show as error
+      } else {
+        const errText = formatAIError(err);
+        appendToAssistant(sessionId!, errText);
+      }
     } finally {
-      // Remove empty assistant messages left after tool-only responses
+      activeAbortController = null;
       set(state => ({
         isStreaming: false,
         sessions: state.sessions.map(s => {
@@ -183,32 +183,101 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 }));
 
+function handleStreamEvent(sessionId: string, event: ChatStreamEvent) {
+  switch (event.type) {
+    case 'text-delta':
+      if (event.text) appendToAssistant(sessionId, event.text);
+      break;
+
+    case 'error':
+      appendToAssistant(sessionId, formatAIError(event.error));
+      break;
+
+    case 'tool-call':
+      useChatStore.setState(state => ({
+        sessions: state.sessions.map(s => {
+          if (s.id !== sessionId) return s;
+          return {
+            ...s,
+            messages: [...s.messages, {
+              role: 'tool_call' as const,
+              content: event.args || '',
+              toolName: event.toolName,
+              toolCallId: event.toolCallId,
+              timestamp: Date.now(),
+              collapsed: false,
+            }],
+          };
+        }),
+      }));
+      break;
+
+    case 'tool-result':
+      useChatStore.setState(state => ({
+        sessions: state.sessions.map(s => {
+          if (s.id !== sessionId) return s;
+          return {
+            ...s,
+            messages: [...s.messages, {
+              role: 'tool_result' as const,
+              content: event.display || '',
+              toolName: event.toolName,
+              toolCallId: event.toolCallId,
+              timestamp: Date.now(),
+              collapsed: true,
+            }],
+          };
+        }),
+      }));
+      break;
+
+    case 'finish':
+      break;
+  }
+}
+
 function appendToAssistant(sessionId: string, text: string) {
   useChatStore.setState(state => ({
     sessions: state.sessions.map(s => {
       if (s.id !== sessionId) return s;
-      const last = s.messages[s.messages.length - 1];
-      if (last?.role === 'assistant') {
+      const msgs = s.messages;
+      let lastAssistantIdx = -1;
+      for (let i = msgs.length - 1; i >= 0; i--) {
+        if (msgs[i].role === 'assistant') { lastAssistantIdx = i; break; }
+      }
+      if (lastAssistantIdx >= 0) {
         return {
           ...s,
-          messages: s.messages.map((m, i) =>
-            i === s.messages.length - 1 ? { ...m, content: m.content + text } : m
+          messages: msgs.map((m, i) =>
+            i === lastAssistantIdx ? { ...m, content: m.content + text } : m
           ),
         };
       }
       return {
         ...s,
-        messages: [...s.messages, { role: 'assistant' as const, content: text, timestamp: Date.now() }],
+        messages: [...msgs, { role: 'assistant' as const, content: text, timestamp: Date.now() }],
       };
     }),
   }));
 }
 
 if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-  chrome.storage.local.get(CHAT_STORAGE_KEY).then(result => {
-    const sessions = result[CHAT_STORAGE_KEY];
+  Promise.all([
+    chrome.storage.local.get(CHAT_STORAGE_KEY),
+    chrome.storage.local.get(AGENT_MODE_KEY),
+  ]).then(([chatResult, agentResult]) => {
+    const sessions = chatResult[CHAT_STORAGE_KEY];
+    const agentMode = agentResult[AGENT_MODE_KEY];
+    const updates: Partial<ChatState> = {};
     if (Array.isArray(sessions) && sessions.length) {
-      useChatStore.setState({ sessions, activeSessionId: sessions[0]?.id || null });
+      updates.sessions = sessions;
+      updates.activeSessionId = sessions[0]?.id || null;
+    }
+    if (typeof agentMode === 'boolean') {
+      updates.agentMode = agentMode;
+    }
+    if (Object.keys(updates).length) {
+      useChatStore.setState(updates);
     }
   }).catch(() => {});
 }

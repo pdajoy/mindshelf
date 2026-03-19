@@ -6,9 +6,8 @@ import {
   exportTab,
   batchExport,
   type ExportTarget,
-  type ExportDepth,
+  type ExportRequest,
 } from '../services/export.service.js';
-import { updateTab, getTabById } from '../db/tab-repo.js';
 
 export const exportRouter = Router();
 
@@ -38,18 +37,14 @@ exportRouter.get('/folders/obsidian', async (_req, res) => {
 
 exportRouter.post('/single', async (req, res) => {
   try {
-    const { tabId, target, depth, folder, model, editedContent, extractor, imageUrls } = req.body;
-    if (!tabId || !target) return res.status(400).json({ error: 'tabId and target required' });
+    const { title, url, domain, topic, tags, userScore, content, target, folder } = req.body;
+    if (!title || !url || !target) return res.status(400).json({ error: 'title, url, and target required' });
 
     const result = await exportTab({
-      tabId,
+      title, url, domain, topic, tags, userScore,
+      content: content || '暂无内容',
       target: target as ExportTarget,
-      depth: (depth || 'standard') as ExportDepth,
       folder,
-      model,
-      editedContent,
-      extractor,
-      imageUrls,
     });
 
     res.json(result);
@@ -59,8 +54,8 @@ exportRouter.post('/single', async (req, res) => {
 });
 
 exportRouter.post('/batch', async (req, res) => {
-  const { tabIds, target, depth, folder, model } = req.body;
-  if (!Array.isArray(tabIds) || !target) return res.status(400).json({ error: 'tabIds and target required' });
+  const { items, target, folder } = req.body;
+  if (!Array.isArray(items) || !target) return res.status(400).json({ error: 'items array and target required' });
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
@@ -70,50 +65,28 @@ exportRouter.post('/batch', async (req, res) => {
   });
 
   try {
+    const requests: ExportRequest[] = items.map((item: any) => ({
+      title: item.title,
+      url: item.url,
+      domain: item.domain,
+      topic: item.topic,
+      tags: item.tags,
+      content: item.content || '暂无内容',
+      target: target as ExportTarget,
+      folder: item.folder || folder,
+    }));
+
     const { successCount, failCount } = await batchExport(
-      tabIds,
-      { target: target as ExportTarget, depth: (depth || 'standard') as ExportDepth, folder, model },
-      (done, total, tabId, result) => {
-        res.write(`data: ${JSON.stringify({ type: 'progress', done, total, tabId, ...result })}\n\n`);
+      requests,
+      (done, total, result) => {
+        res.write(`data: ${JSON.stringify({ type: 'progress', done, total, ...result })}\n\n`);
       },
     );
-    res.write(`data: ${JSON.stringify({ type: 'complete', successCount, failCount, total: tabIds.length })}\n\n`);
+    res.write(`data: ${JSON.stringify({ type: 'complete', successCount, failCount, total: items.length })}\n\n`);
     res.write('data: [DONE]\n\n');
   } catch (err) {
     res.write(`data: ${JSON.stringify({ type: 'error', message: (err as Error).message })}\n\n`);
     res.write('data: [DONE]\n\n');
   }
   res.end();
-});
-
-exportRouter.post('/score', (req, res) => {
-  try {
-    const { tabId, score } = req.body;
-    if (!tabId || score === undefined) return res.status(400).json({ error: 'tabId and score required' });
-    if (score < 1 || score > 10) return res.status(400).json({ error: 'score must be 1-10' });
-    const tab = updateTab(tabId, { user_score: score } as any);
-    if (!tab) return res.status(404).json({ error: 'Tab not found' });
-    res.json({ success: true, tab });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
-
-exportRouter.post('/validate', async (req, res) => {
-  try {
-    const { tabId, target } = req.body;
-    const tab = getTabById(tabId);
-    const issues: string[] = [];
-    if (!tab) issues.push('标签不存在');
-    if (target === 'apple_notes') {
-      const check = await checkTargets();
-      if (!check.apple_notes.available) issues.push(`Apple Notes 不可用: ${check.apple_notes.error || '未知错误'}`);
-    } else if (target === 'obsidian') {
-      const check = await checkTargets();
-      if (!check.obsidian.available) issues.push(`Obsidian 不可用: ${check.obsidian.error || '未知错误'}`);
-    }
-    res.json({ valid: issues.length === 0, issues });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
 });

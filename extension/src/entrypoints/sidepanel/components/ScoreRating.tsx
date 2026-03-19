@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { api } from '@/lib/api';
 import { useTabStore } from '../stores/tab-store';
 import { cn } from '@/lib/utils';
 
@@ -11,29 +10,14 @@ interface ScoreRatingProps {
 
 export function ScoreRating({ tabId, currentScore, compact }: ScoreRatingProps) {
   const [hoveredScore, setHoveredScore] = useState<number | null>(null);
-  const [saving, setSaving] = useState(false);
   const { updateTab } = useTabStore();
 
-  const handleClick = async (score: number) => {
-    if (saving) return;
+  const handleClick = (score: number) => {
     const newScore = score === currentScore ? 0 : score;
-    setSaving(true);
-    try {
-      if (newScore === 0) {
-        await api.tabs.update(tabId, { user_score: null } as any);
-        updateTab(tabId, { user_score: null });
-      } else {
-        await api.export.score(tabId, newScore);
-        updateTab(tabId, { user_score: newScore });
-      }
-    } catch (err) {
-      console.error('Failed to save score:', err);
-    }
-    setSaving(false);
+    updateTab(tabId, { user_score: newScore || null });
   };
 
   const displayScore = hoveredScore ?? currentScore ?? 0;
-  const maxStars = compact ? 5 : 10;
   const displayMax = compact ? 5 : 10;
 
   const getScoreLabel = (score: number): string => {
@@ -56,12 +40,11 @@ export function ScoreRating({ tabId, currentScore, compact }: ScoreRatingProps) 
               onClick={() => handleClick(score)}
               onMouseEnter={() => setHoveredScore(score)}
               onMouseLeave={() => setHoveredScore(null)}
-              disabled={saving}
               className={cn(
                 'transition-colors',
                 compact ? 'text-xs' : 'text-sm',
                 filled ? 'text-amber-500' : 'text-muted-foreground/30',
-                'hover:text-amber-400 cursor-pointer disabled:cursor-wait'
+                'hover:text-amber-400 cursor-pointer'
               )}
               title={`${score}/${displayMax}`}
             >

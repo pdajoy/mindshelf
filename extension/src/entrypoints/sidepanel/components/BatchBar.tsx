@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import { useTabStore } from '../stores/tab-store';
-import { useSettingsStore } from '../stores/settings-store';
 import { api } from '@/lib/api';
 import { X, Sparkles, FileEdit, Star, Loader2, CheckCircle } from 'lucide-react';
 import { useAIStore } from '../stores/ai-store';
-import type { ExportTarget, ExportDepth } from '@/lib/types';
+import type { ExportTarget } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 export function BatchBar() {
   const { selectedIds, clearSelection, tabs, removeTab, fetchTabs } = useTabStore();
   const { startClassify } = useAIStore();
-  const { selectedModel } = useSettingsStore();
   const [showBatchExport, setShowBatchExport] = useState(false);
   const [showScore, setShowScore] = useState(false);
   const [batchTarget, setBatchTarget] = useState<ExportTarget>('apple_notes');
-  const [batchDepth, setBatchDepth] = useState<ExportDepth>('light');
   const [batchFolder, setBatchFolder] = useState('MindShelf');
   const [exporting, setExporting] = useState(false);
   const [exportResult, setExportResult] = useState<{ success: number; fail: number } | null>(null);
@@ -30,7 +27,6 @@ export function BatchBar() {
           chrome.runtime.sendMessage({ type: 'CLOSE_TAB', tabId: tab.source_tab_id });
         }
       }
-      await api.tabs.batchStatus(ids, 'closed');
       for (const id of ids) removeTab(id);
       clearSelection();
     } catch (err) {
@@ -44,8 +40,20 @@ export function BatchBar() {
     const ids = Array.from(selectedIds);
     let success = 0, fail = 0;
     for (const id of ids) {
+      const tab = tabs.find(t => t.id === id);
+      if (!tab) { fail++; continue; }
       try {
-        const r = await api.export.single(id, { target: batchTarget, depth: batchDepth, folder: batchFolder, model: selectedModel || undefined });
+        const r = await api.export.single({
+          title: tab.title,
+          url: tab.url,
+          domain: tab.domain,
+          topic: tab.topic || undefined,
+          tags: tab.tags,
+          userScore: tab.user_score || undefined,
+          content: tab.ai_summary || tab.content_text?.substring(0, 30000) || '暂无内容',
+          target: batchTarget,
+          folder: batchFolder,
+        });
         if (r.success) success++; else fail++;
       } catch { fail++; }
     }
@@ -54,13 +62,10 @@ export function BatchBar() {
     fetchTabs();
   };
 
-  const handleBatchScore = async (score: number) => {
+  const handleBatchScore = (score: number) => {
     const ids = Array.from(selectedIds);
     for (const id of ids) {
-      try {
-        await api.export.score(id, score);
-        useTabStore.getState().updateTab(id, { user_score: score });
-      } catch {}
+      useTabStore.getState().updateTab(id, { user_score: score });
     }
     setShowScore(false);
   };
@@ -108,13 +113,6 @@ export function BatchBar() {
             <button onClick={() => setBatchTarget('obsidian')} className={cn('flex-1 h-7 rounded-lg border text-xs', batchTarget === 'obsidian' ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted')}>
               💎 Obsidian
             </button>
-          </div>
-          <div className="flex gap-1.5">
-            {(['light', 'standard', 'full'] as const).map(d => (
-              <button key={d} onClick={() => setBatchDepth(d)} className={cn('flex-1 h-6 rounded text-[10px]', batchDepth === d ? 'bg-primary text-primary-foreground font-medium' : 'bg-muted text-muted-foreground')}>
-                {d === 'light' ? '轻量' : d === 'standard' ? '标准' : '完整'}
-              </button>
-            ))}
           </div>
           <input
             value={batchFolder}

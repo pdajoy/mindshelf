@@ -25,6 +25,13 @@ jobs:
           cache: npm
           cache-dependency-path: extension/package-lock.json
 
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: extension
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+
       - name: Install dependencies
         run: npm ci
         working-directory: extension
@@ -53,6 +60,12 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v6
+
+      - name: Set version from tag
+        working-directory: backend
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3

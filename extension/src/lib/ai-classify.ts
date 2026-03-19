@@ -1,7 +1,6 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { getModel } from './ai-provider.js';
-import { updateTab } from '../db/tab-repo.js';
+import { getModel, type AIConfig } from './ai-client';
 
 export interface CategoryDef {
   name: string;
@@ -28,35 +27,20 @@ export const CATEGORY_DEFINITIONS: Record<string, CategoryDef> = {
 };
 
 const DOMAIN_RULES: Array<{ pattern: RegExp; category: string }> = [
-  // AI/ML — specific before general
   { pattern: /huggingface|openai\.com|anthropic\.com|ollama|replicate\.com|together\.ai|deepseek|groq\.com|mistral\.ai|cohere\.com|wandb\.ai|mlflow/i, category: 'ai-ml' },
-  // Security / Reverse engineering
   { pattern: /kanxue\.com|freebuf|seebug|exploit-db|cve\.|hackerone|bugcrowd|virustotal|shodan|crackstation|ghidra|radare/i, category: 'security' },
-  // DevOps / Infra / Cloud
   { pattern: /docker\.com|kubernetes\.io|k8s|terraform|ansible|jenkins|grafana|prometheus|datadog|cloudflare|aws\.amazon|cloud\.google|azure\.microsoft|vercel\.com|netlify|railway|render\.com|fly\.io/i, category: 'devops' },
-  // Networking
   { pattern: /openwrt|mikrotik|pfsense|ubiquiti|unifi|opnsense|softether|wireguard|tailscale|zerotier/i, category: 'networking' },
-  // Reference / Docs (before programming to catch docs sites)
   { pattern: /docs\.|documentation|readme|wiki\.|developer\.|devdocs|man7\.org|manpages/i, category: 'reference' },
-  // Programming / Dev platforms (general code hosts)
   { pattern: /github\.com|gitlab|bitbucket|stackoverflow|stackexchange|npmjs|pypi|crates\.io|pkg\.go\.dev|rubygems|packagist/i, category: 'programming' },
-  // Research
   { pattern: /arxiv|scholar\.google|researchgate|ieee|acm\.org|nature\.com|sciencedirect|ssrn|pubmed/i, category: 'research' },
-  // Entertainment
   { pattern: /youtube|twitch|netflix|spotify|bilibili|v\.qq|iqiyi|disneyplus|hbo|primevideo/i, category: 'entertainment' },
-  // Social
   { pattern: /twitter|x\.com|facebook|instagram|reddit|weibo|zhihu|v2ex|discourse|mastodon|threads\.net|wechat|weixin|mp\.weixin/i, category: 'social' },
-  // Shopping
   { pattern: /amazon|taobao|jd\.com|ebay|shopify|aliexpress|pinduoduo|walmart/i, category: 'shopping' },
-  // Design
   { pattern: /figma|dribbble|behance|canva|sketch|framer|adobe\.com\/products/i, category: 'design' },
-  // Business
   { pattern: /bloomberg|reuters|wsj|ft\.com|cnbc|investing|crunchbase|pitchbook/i, category: 'business' },
-  // News
   { pattern: /bbc|cnn|nytimes|theguardian|36kr|ifanr|sspai|techcrunch|theverge|arstechnica/i, category: 'news' },
-  // Tools
   { pattern: /notion|trello|slack|asana|linear|supabase|postman|insomnia/i, category: 'tools' },
-  // Tech blogs — need title analysis to further distinguish, set as programming by default
   { pattern: /juejin|segmentfault|csdn|cnblogs|jianshu|medium\.com|dev\.to|hashnode/i, category: 'programming' },
 ];
 
@@ -73,46 +57,45 @@ const TITLE_KEYWORDS: Record<string, RegExp> = {
   'business': /(融资|投资|商业|创业|startup|saas|revenue|估值|valuation|ipo|市场|market)/i,
 };
 
-const AI_CLASSIFY_PROMPT = `你是一个智能网页标签分类专家。目标是将浏览器标签页精确归类到最合适的细分类别。
+const AI_CLASSIFY_SYSTEM = `你是一个智能网页标签分类专家。目标是将浏览器标签页精确归类到最合适的细分类别。
 
 可用类别（严格使用这些 ID）：
-- ai-ml: AI/机器学习 — LLM, prompt工程, 训练, 模型, RAG, Agent, 向量数据库, AI应用
-- programming: 编程开发 — 编程语言, 框架, 前端, 后端, 算法, 开源项目, 代码实践
-- devops: 运维/DevOps — Docker, K8s, CI/CD, 云服务, 监控, 部署, 基础设施
-- security: 安全/逆向 — 渗透测试, 漏洞, 逆向工程, CTF, 二进制分析, 加密
-- networking: 网络/协议 — 路由, 交换, VLAN, DNS, VPN, 代理, WiFi, 软路由, 网络架构
-- research: 研究/学术 — 论文, 学术研究, 实验, 数据分析
-- news: 新闻/资讯 — 新闻报道, 行业动态（纯资讯性内容）
-- design: 设计/创意 — UI/UX, 平面设计, 动效, 原型
-- business: 商业/金融 — 创业, 投资, 市场分析, SaaS
-- entertainment: 娱乐/视频 — 视频, 音乐, 游戏, 影视
-- social: 社交/论坛 — 社交媒体, 论坛讨论（非技术内容为主）
-- shopping: 购物/电商 — 网购, 商品, 电商平台
-- reference: 参考/文档 — 官方文档, 教程, API参考, 手册
-- tools: 工具/服务 — SaaS工具, 在线服务, 效率工具
+- ai-ml: AI/机器学习
+- programming: 编程开发
+- devops: 运维/DevOps
+- security: 安全/逆向
+- networking: 网络/协议
+- research: 研究/学术
+- news: 新闻/资讯
+- design: 设计/创意
+- business: 商业/金融
+- entertainment: 娱乐/视频
+- social: 社交/论坛
+- shopping: 购物/电商
+- reference: 参考/文档
+- tools: 工具/服务
 - other: 其他
 
 关键分类原则：
 1. 看内容本质而非来源平台。GitHub上的AI项目→ai-ml，GitHub上的路由器固件→networking
-2. 技术博客/论坛（CSDN/掘金/Medium等）：根据文章具体主题分类，不要笼统归为 programming
-3. AI相关内容要仔细区分：prompt工程→ai-ml，用AI写代码的教程→programming，AI安全→security
-4. 分类必须反映用户真实的知识管理需求——"这篇内容属于我的哪个知识领域？"
-5. 生成tags时要具体有意义，例如 ["C++", "编译器", "LLVM"] 而非泛泛的 ["tech", "code"]
+2. 技术博客/论坛根据文章具体主题分类，不要笼统归为 programming
+3. AI相关内容要仔细区分：prompt工程→ai-ml，用AI写代码的教程→programming
+4. 生成tags时要具体有意义，例如 ["C++", "编译器", "LLVM"] 而非泛泛的 ["tech", "code"]
+5. 使用json输出结果`;
 
-请严格返回 JSON：
-{
-  "classifications": [
-    {
-      "id": "标签ID",
-      "category": "类别ID",
-      "confidence": 0.0-1.0,
-      "reason": "简短理由",
-      "tags": ["具体标签1", "具体标签2", "具体标签3"]
-    }
-  ]
-}`;
+const classifyResultSchema = z.object({
+  classifications: z.array(
+    z.object({
+      id: z.string(),
+      category: z.string(),
+      confidence: z.number(),
+      reason: z.string(),
+      tags: z.array(z.string()),
+    }),
+  ),
+});
 
-interface TabInput {
+export interface TabInput {
   id: string;
   url: string;
   title: string;
@@ -120,7 +103,7 @@ interface TabInput {
   content_text?: string | null;
 }
 
-interface ClassifyResult {
+export interface ClassifyResult {
   category: string;
   confidence: number;
   source: string;
@@ -128,24 +111,24 @@ interface ClassifyResult {
   tags?: string[];
 }
 
-interface ProgressEvent {
+export interface ProgressEvent {
   stage: number;
   stageName: string;
   stageDesc: string;
   processed: number;
   total: number;
   pct: number;
-  [key: string]: unknown;
 }
 
 export async function categorizeTabs(
   tabs: TabInput[],
-  opts: { onProgress?: (p: ProgressEvent) => void; model?: string } = {}
-) {
-  const { onProgress, model } = opts;
+  config: AIConfig,
+  opts: { onProgress?: (p: ProgressEvent) => void; abortSignal?: AbortSignal } = {},
+): Promise<{ classifications: Record<string, ClassifyResult>; stats: any }> {
+  const { onProgress, abortSignal } = opts;
   const results: Record<string, ClassifyResult> = {};
 
-  // === Phase 1: Domain grouping ===
+  // Phase 1: Domain grouping
   onProgress?.({ stage: 1, stageName: '域名聚合', stageDesc: '按域名快速分组', processed: 0, total: tabs.length, pct: 0 });
 
   const domainGroups: Record<string, TabInput[]> = {};
@@ -166,12 +149,12 @@ export async function categorizeTabs(
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
-  // === Phase 2: Rule-based ===
+  // Phase 2: Rule-based
   onProgress?.({ stage: 2, stageName: '规则识别', stageDesc: '匹配已知平台和域名模式', processed: 0, total: tabs.length, pct: 0 });
 
   const CONTENT_PLATFORMS = /juejin|segmentfault|csdn|cnblogs|jianshu|medium\.com|dev\.to|hashnode|zhihu|v2ex|reddit/i;
-
   let ruleMatched = 0;
+
   for (const tab of tabs) {
     const fullUrl = tab.url || tab.domain || '';
     for (const { pattern, category } of DOMAIN_RULES) {
@@ -195,7 +178,7 @@ export async function categorizeTabs(
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
-  // === Phase 3: Title keywords ===
+  // Phase 3: Title keywords
   onProgress?.({ stage: 3, stageName: '标题分析', stageDesc: '通过标题关键词判断类别', processed: 0, total: tabs.length, pct: 0 });
 
   let titleMatched = 0;
@@ -223,25 +206,16 @@ export async function categorizeTabs(
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
-  // === Phase 4: AI deep analysis ===
+  // Phase 4: AI deep analysis
   const needsAI = tabs.filter(t => !results[t.id] || results[t.id].confidence < 0.6);
 
   if (needsAI.length > 0) {
-    const aiModel = getModel(model);
     const batchSize = 30;
     const totalBatches = Math.ceil(needsAI.length / batchSize);
 
-    const classificationSchema = z.object({
-      classifications: z.array(z.object({
-        id: z.string(),
-        category: z.string(),
-        confidence: z.number().min(0).max(1).optional(),
-        reason: z.string().optional(),
-        tags: z.array(z.string()).optional(),
-      })),
-    });
-
     onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: `${needsAI.length} 个标签需要AI判断`, processed: 0, total: needsAI.length, pct: 0 });
+
+    const model = getModel(config);
 
     for (let i = 0; i < needsAI.length; i += batchSize) {
       const batchNum = Math.floor(i / batchSize) + 1;
@@ -261,13 +235,15 @@ export async function categorizeTabs(
 
       const userMsg = `请将以下 ${batch.length} 个标签归类：\n\n${JSON.stringify(tabList, null, 2)}`;
 
+      if (abortSignal?.aborted) throw new DOMException('Aborted', 'AbortError');
       try {
         const { object: parsed } = await generateObject({
-          model: aiModel,
-          schema: classificationSchema,
-          system: AI_CLASSIFY_PROMPT,
+          model,
+          system: AI_CLASSIFY_SYSTEM,
           prompt: userMsg,
+          schema: classifyResultSchema,
           temperature: 0.3,
+          abortSignal,
         });
 
         for (const item of parsed.classifications) {
@@ -284,7 +260,7 @@ export async function categorizeTabs(
           }
         }
       } catch (err) {
-        console.error(`[Categorizer] AI batch ${batchNum} failed:`, (err as Error).message);
+        console.error(`[Classify] AI batch ${batchNum} failed:`, (err as Error).message);
         for (const tab of batch) {
           if (!results[tab.id]) {
             results[tab.id] = { category: 'other', confidence: 0.3, source: 'fallback' };
@@ -298,7 +274,7 @@ export async function categorizeTabs(
     onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: '所有标签已通过规则和标题分类，跳过AI', processed: 0, total: 0, pct: 100 });
   }
 
-  // === Phase 5: Consolidation ===
+  // Phase 5: Consolidation
   onProgress?.({ stage: 5, stageName: '整合修正', stageDesc: '交叉验证并合并分类结果', processed: 0, total: tabs.length, pct: 0 });
 
   for (const tab of tabs) {
@@ -332,15 +308,7 @@ export async function categorizeTabs(
   return { classifications: results, stats };
 }
 
-export function applyClassifications(classifications: Record<string, ClassifyResult>) {
-  const now = new Date().toISOString();
-  for (const [tabId, data] of Object.entries(classifications)) {
-    const tags = data.tags ? JSON.stringify(data.tags) : '[]';
-    updateTab(tabId, { topic: data.category, tags, processed_at: now } as any);
-  }
-}
-
-function generateBasicTags(tab: TabInput, category: string): string[] {
+function generateBasicTags(tab: TabInput, _category: string): string[] {
   const tags: string[] = [];
   const title = (tab.title || '').toLowerCase();
   const domain = tab.domain || '';
