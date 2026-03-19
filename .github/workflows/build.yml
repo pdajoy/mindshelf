@@ -109,8 +109,8 @@ jobs:
 
       - name: Prepare Docker context
         run: |
-          cp context/backend/Dockerfile.ci context/backend/Dockerfile
-          ls -la context/backend/dist/
+          cp context/Dockerfile.ci context/Dockerfile
+          ls -la context/dist/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -132,7 +132,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: context/backend
+          context: context
           platforms: ${{ matrix.platform }}
           push: true
           labels: ${{ steps.meta.outputs.labels }}
