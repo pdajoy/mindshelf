@@ -4,7 +4,7 @@
   "description": "MindShelf — AI-powered Chrome tab manager with MCP support",
   "type": "module",
   "bin": {
-    "mindshelf": "./dist/cli.js"
+    "mindshelf": "dist/cli.js"
   },
   "files": [
     "dist",
@@ -32,7 +32,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/pdajoy/mindshelf.git",
+    "url": "git+https://github.com/pdajoy/mindshelf.git",
     "directory": "backend"
   },
   "homepage": "https://github.com/pdajoy/mindshelf",
