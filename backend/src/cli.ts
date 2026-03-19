@@ -9,7 +9,11 @@
  *   npx mindshelf --obsidian-vault /path/to/vault
  */
 import 'dotenv/config';
+import { createRequire } from 'node:module';
 import { parseArgs } from 'node:util';
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../package.json');
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
@@ -22,7 +26,7 @@ const { values, positionals } = parseArgs({
 });
 
 if (values.version) {
-  console.log('mindshelf 2.3.0');
+  console.log(`mindshelf ${PKG_VERSION}`);
   process.exit(0);
 }
 

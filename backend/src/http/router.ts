@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'http';
+import { createRequire } from 'module';
 import {
   checkTargets,
   getAppleNotesFolders,
@@ -8,6 +9,9 @@ import {
   type ExportTarget,
   type ExportRequest,
 } from '../services/export.service.js';
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../../package.json');
 import { isExtensionConnected, invoke } from '../mcp/bridge.js';
 
 function json(res: ServerResponse, data: unknown, status = 200): void {
@@ -61,7 +65,7 @@ export async function handleRequest(req: IncomingMessage, res: ServerResponse): 
     if (path === '/api/health' && req.method === 'GET') {
       json(res, {
         status: 'ok',
-        version: '2.3.0',
+        version: PKG_VERSION,
         name: 'MindShelf Backend',
         bridge: isExtensionConnected() ? 'connected' : 'disconnected',
       });

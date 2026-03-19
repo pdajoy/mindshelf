@@ -1,7 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { createRequire } from 'module';
 import { z } from 'zod';
 import { invoke as directInvoke, isExtensionConnected } from './bridge.js';
 import { exportTab, checkTargets, type ExportTarget } from '../services/export.service.js';
+
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../../package.json');
 
 export type BridgeInvoker = (method: string, params?: Record<string, unknown>) => Promise<unknown>;
 
@@ -15,7 +19,7 @@ export function createMcpServer(options?: { invoke?: BridgeInvoker }): McpServer
   }
   const server = new McpServer({
     name: 'mindshelf',
-    version: '2.3.0',
+    version: PKG_VERSION,
   });
 
   server.tool(

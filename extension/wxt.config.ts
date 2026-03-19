@@ -19,8 +19,6 @@ export default defineConfig({
     permissions: [
       'tabs',
       'activeTab',
-      'bookmarks',
-      'notifications',
       'alarms',
       'sidePanel',
       'scripting',
