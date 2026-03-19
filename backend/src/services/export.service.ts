@@ -15,6 +15,17 @@ export interface ExportRequest {
   content: string;
   target: ExportTarget;
   folder?: string;
+  locale?: string;
+}
+
+const LABELS: Record<string, Record<string, string>> = {
+  zh: { category: '分类', tags: '标签', rating: '评分', source: '原文链接' },
+  en: { category: 'Category', tags: 'Tags', rating: 'Rating', source: 'Source' },
+};
+
+function labels(locale?: string): Record<string, string> {
+  const lang = (locale || 'en').startsWith('zh') ? 'zh' : 'en';
+  return LABELS[lang];
 }
 
 export interface ExportResult {
@@ -58,12 +69,13 @@ function esc(str: string): string {
 function wrapAppleNotes(req: ExportRequest): string {
   const htmlContent = mdToHtml(req.content);
   const tags = req.tags || [];
+  const l = labels(req.locale);
 
   const meta: string[] = [];
   meta.push(`<p>🔗 <a href="${esc(req.url)}">${esc(req.url)}</a></p>`);
-  if (req.topic) meta.push(`<p><strong>分类：</strong>${esc(req.topic)}${tags.length ? ` · ${tags.map(t => '#' + esc(t)).join(' ')}` : ''}</p>`);
-  else if (tags.length) meta.push(`<p><strong>标签：</strong>${tags.map(t => '#' + esc(t)).join(' ')}</p>`);
-  if (req.userScore) meta.push(`<p><strong>评分：</strong>${'⭐'.repeat(Math.min(req.userScore, 10))} (${req.userScore}/10)</p>`);
+  if (req.topic) meta.push(`<p><strong>${l.category}:</strong> ${esc(req.topic)}${tags.length ? ` · ${tags.map(t => '#' + esc(t)).join(' ')}` : ''}</p>`);
+  else if (tags.length) meta.push(`<p><strong>${l.tags}:</strong> ${tags.map(t => '#' + esc(t)).join(' ')}</p>`);
+  if (req.userScore) meta.push(`<p><strong>${l.rating}:</strong> ${'⭐'.repeat(Math.min(req.userScore, 10))} (${req.userScore}/10)</p>`);
 
   return [
     `<h1>${esc(req.title)}</h1>`,
@@ -72,7 +84,7 @@ function wrapAppleNotes(req: ExportRequest): string {
     '<hr>',
     htmlContent,
     '<hr>',
-    `<p style="color:gray;font-size:small">Saved by MindShelf · ${new Date().toLocaleString('zh-CN')}</p>`,
+    `<p style="color:gray;font-size:small">Saved by MindShelf · ${new Date().toISOString().split('T')[0]}</p>`,
   ].join('\n');
 }
 
@@ -100,9 +112,10 @@ function wrapObsidian(req: ExportRequest): string {
     }
   }
   lines.push('---', '');
-  lines.push(`# ${req.title}`, '', `> 🔗 [原文链接](${req.url})`, '');
+  const l = labels(req.locale);
+  lines.push(`# ${req.title}`, '', `> 🔗 [${l.source}](${req.url})`, '');
   lines.push(req.content);
-  lines.push('', '---', `*Saved by MindShelf · ${new Date().toLocaleString('zh-CN')}*`);
+  lines.push('', '---', `*Saved by MindShelf · ${new Date().toISOString().split('T')[0]}*`);
   return lines.join('\n');
 }
 

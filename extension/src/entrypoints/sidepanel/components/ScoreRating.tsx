@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTabStore } from '../stores/tab-store';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 
 interface ScoreRatingProps {
   tabId: string;
@@ -9,6 +10,7 @@ interface ScoreRatingProps {
 }
 
 export function ScoreRating({ tabId, currentScore, compact }: ScoreRatingProps) {
+  const { t } = useT();
   const [hoveredScore, setHoveredScore] = useState<number | null>(null);
   const { updateTab } = useTabStore();
 
@@ -22,11 +24,11 @@ export function ScoreRating({ tabId, currentScore, compact }: ScoreRatingProps) 
 
   const getScoreLabel = (score: number): string => {
     if (score <= 0) return '';
-    if (score <= 2) return '一般';
-    if (score <= 4) return '有价值';
-    if (score <= 6) return '值得保存';
-    if (score <= 8) return '很有价值';
-    return '必须保存';
+    if (score <= 2) return t('score.normal');
+    if (score <= 4) return t('score.valuable');
+    if (score <= 6) return t('score.worthSaving');
+    if (score <= 8) return t('score.veryValuable');
+    return t('score.mustSave');
   };
 
   return (

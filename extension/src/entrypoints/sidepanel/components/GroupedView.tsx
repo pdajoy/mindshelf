@@ -6,6 +6,7 @@ import { flashWhenStable } from '@/lib/scroll-flash';
 import { ChevronDown, ChevronRight, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TabRecord } from '@/lib/types';
+import { useT } from '@/lib/i18n';
 
 type GroupBy = 'tags' | 'topic' | 'domain';
 
@@ -17,6 +18,7 @@ interface GroupData {
 }
 
 export function GroupedView() {
+  const { t } = useT();
   const tabs = useFilteredTabs();
   const { pendingLocateTabId, clearPendingLocate } = useNavStore();
   const [groupBy, setGroupBy] = useState<GroupBy>('tags');
@@ -27,7 +29,7 @@ export function GroupedView() {
 
     if (groupBy === 'tags') {
       for (const tab of tabs) {
-        const tags = tab.tags?.length ? tab.tags : ['未标记'];
+        const tags = tab.tags?.length ? tab.tags : [t('grouped.untagged')];
         for (const tag of tags) {
           if (!map.has(tag)) map.set(tag, []);
           map.get(tag)!.push(tab);
@@ -35,13 +37,13 @@ export function GroupedView() {
       }
     } else if (groupBy === 'topic') {
       for (const tab of tabs) {
-        const key = tab.topic || '未分类';
+        const key = tab.topic || t('grouped.uncategorized');
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(tab);
       }
     } else {
       for (const tab of tabs) {
-        const key = tab.domain || '未知域名';
+        const key = tab.domain || t('grouped.unknownDomain');
         if (!map.has(key)) map.set(key, []);
         map.get(key)!.push(tab);
       }
@@ -75,13 +77,13 @@ export function GroupedView() {
     const targetId = pendingLocateTabId;
 
     if (targetId === '__not_found__') {
-      showToast('当前标签不在列表中');
+      showToast(t('tabList.notInList'));
       return;
     }
 
     const groupsWithTab = groups.filter(g => g.tabs.some(t => t.id === targetId));
     if (groupsWithTab.length === 0) {
-      showToast('当前标签不在已过滤的列表中');
+      showToast(t('tabList.notInFiltered'));
       return;
     }
 
@@ -118,12 +120,12 @@ export function GroupedView() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <Tags className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">分组方式：</span>
+            <span className="text-xs text-muted-foreground">{t('grouped.groupBy')}</span>
             <div className="flex gap-0.5">
               {([
-                { value: 'tags' as const, label: '标签' },
-                { value: 'topic' as const, label: '分类' },
-                { value: 'domain' as const, label: '域名' },
+                { value: 'tags' as const, label: t('grouped.tags') },
+                { value: 'topic' as const, label: t('grouped.topic') },
+                { value: 'domain' as const, label: t('grouped.domain') },
               ]).map(opt => (
                 <button
                   key={opt.value}
@@ -141,10 +143,10 @@ export function GroupedView() {
             </div>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <span>{totalGroups} 组 · {totalTabs} 标签</span>
-            <button onClick={expandAll} className="hover:text-foreground">展开</button>
+            <span>{totalGroups} {t('grouped.groups')} · {totalTabs} {t('header.tabs')}</span>
+            <button onClick={expandAll} className="hover:text-foreground">{t('grouped.expand')}</button>
             <span>|</span>
-            <button onClick={collapseAll} className="hover:text-foreground">折叠</button>
+            <button onClick={collapseAll} className="hover:text-foreground">{t('grouped.collapse')}</button>
           </div>
         </div>
       </div>
@@ -183,7 +185,7 @@ export function GroupedView() {
 
       {groups.length === 0 && (
         <div className="flex items-center justify-center h-32 text-xs text-muted-foreground">
-          没有可分组的标签
+          {t('grouped.noGroups')}
         </div>
       )}
     </div>

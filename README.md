@@ -29,30 +29,27 @@ Anxiety ("I have 300 tabs")
 - **Content Extraction** — Defuddle / Readability / plaintext, switchable per tab
 - **Virtual Scrolling** — Handles 2000+ tabs smoothly
 - **Multi-Provider AI** — OpenAI, Anthropic, and any OpenAI-compatible API (Ollama, vLLM, Azure, etc.)
+- **MCP Server** — External AI agents (Cursor, Claude Desktop) can manage your tabs via MCP
+- **i18n** — Chinese and English interface with auto-detection
 - **Dark Mode** — System / Light / Dark theme cycling
 
 ## Quick Start
 
-### Option A: Download from Release (recommended)
+### Option A: Extension only (recommended)
 
-1. Go to [Releases](https://github.com/pdajoy/mindshelf/releases) and download the latest Chrome extension zip
+MindShelf's AI runs entirely in the browser. You only need the backend if you want to export to Apple Notes or Obsidian, or use MCP.
+
+1. Go to [Releases](https://github.com/pda-labs/mindshelf/releases) and download the latest Chrome extension zip
 2. Unzip and load in `chrome://extensions/` (Developer mode → Load unpacked)
-3. Start the backend with Docker:
+3. Open the side panel → configure your AI provider in Settings (gear icon)
+4. Done. Start scanning and classifying.
 
-```bash
-docker run -d -p 3456:3456 \
-  -e AI_PROVIDER=openai \
-  -e OPENAI_API_KEY=sk-xxx \
-  -e OPENAI_MODEL=gpt-4o-mini \
-  ghcr.io/pdajoy/mindshelf/backend:main
-```
-
-### Option B: Build from source
+### Option B: With backend (for export & MCP)
 
 ```bash
 # Backend
 cd backend
-cp .env.example .env    # fill in your AI API key
+cp .env.example .env    # configure Obsidian vault path if needed
 npm install && npm run dev
 
 # Extension
@@ -61,61 +58,115 @@ npm install && npm run build
 # Load extension/dist/chrome-mv3/ in chrome://extensions/
 
 # Development (HMR)
-npm run dev
+cd extension && npm run dev
+```
+
+Or use Docker for the backend:
+
+```bash
+docker run -d -p 3456:3456 \
+  -v /path/to/obsidian/vault:/vault \
+  -e OBSIDIAN_VAULT_PATH=/vault \
+  ghcr.io/pda-labs/mindshelf/backend:main
 ```
 
 ### Use it
 
-Open the side panel → tabs are scanned automatically → click **Classify** → AI categorizes everything → click **export** on any tab → save to your notes → close tabs, worry-free.
-
-## Configuration
-
-Create `backend/.env` from `.env.example`, or pass as Docker env vars:
-
-```env
-AI_PROVIDER=openai              # openai | anthropic
-OPENAI_API_KEY=sk-xxx
-OPENAI_MODEL=gpt-4o-mini
-
-# For Ollama or other OpenAI-compatible APIs:
-# OPENAI_BASE_URL=http://localhost:11434/v1
-# OPENAI_API_KEY=ollama
-
-# Obsidian export (direct file write, no Obsidian running needed)
-OBSIDIAN_VAULT_PATH=/path/to/vault
-```
-
-See [`.env.example`](backend/.env.example) for all options.
+Open the side panel → tabs are scanned automatically → click **Classify** → AI categorizes everything → click **save** on any tab → export to your notes → close tabs, worry-free.
 
 ## Architecture
 
 ```
 Chrome Extension (WXT + React 19 + TailwindCSS v4 + Zustand)
-    ├── Side Panel — tab list, AI chat, note export, settings
-    ├── Content Script — page content extraction
+    ├── Side Panel — tab list, AI chat, note export, settings overlay
+    ├── Content Script — Defuddle / Readability page extraction
+    ├── Background — WebSocket bridge client, tab lifecycle
     ├── Popup — quick summary & save
+    ├── AI Engine — Vercel AI SDK (runs in browser, direct API calls)
+    │   ├── Classification — 5-stage pipeline
+    │   ├── Chat / Agent — streaming + tool calling (7 tools)
+    │   └── Note optimization
+    ├── i18n — i18next (zh/en)
     └── chrome.storage.local — enrichment cache (60-day TTL)
                 │
-                │ HTTP / SSE
+                │ HTTP (export only)
+                │ WebSocket (MCP bridge)
                 ▼
-Backend (Express + TypeScript, in-memory)
-    ├── AI — Vercel AI SDK 6, multi-provider streaming
-    ├── Classification — 5-stage pipeline (domain → rules → keywords → AI → merge)
-    ├── Export — Markdown-first → Apple Notes HTML / Obsidian MD
-    └── Bridges — Apple Notes (osascript) · Obsidian (fs / REST API)
+Backend (Express + TypeScript, lightweight)
+    ├── Export — Apple Notes (osascript/JXA) · Obsidian (direct file write)
+    ├── MCP Server — 10 tools via @modelcontextprotocol/sdk
+    └── WebSocket Bridge — relays MCP commands to extension
 ```
+
+**Key design decision**: AI runs in the extension, not the backend. This means:
+- No API key stored on server — users configure providers directly in the extension
+- No backend needed for core features (scan, classify, summarize, chat)
+- Backend is optional — only needed for export to Apple Notes/Obsidian and MCP integration
+
+## Configuration
+
+### AI Providers (in extension Settings)
+
+Click the gear icon → **AI Providers**:
+- Add multiple providers (OpenAI, Anthropic, or any OpenAI-compatible API)
+- Each provider can have multiple models
+- Set API key, base URL, and model list per provider
+- Activate one provider and select a default model
+
+### Backend (optional)
+
+Create `backend/.env` from `.env.example`:
+
+```env
+PORT=3456
+
+# Obsidian export (direct file write to vault directory)
+# OBSIDIAN_VAULT_PATH=/path/to/your/obsidian/vault
+```
+
+### MCP Integration
+
+MindShelf exposes 10 tools via MCP for external AI agents.
+
+**Cursor / Claude Desktop** (stdio):
+```json
+{
+  "mcpServers": {
+    "mindshelf": {
+      "command": "npx",
+      "args": ["tsx", "/path/to/backend/src/mcp/stdio.ts"]
+    }
+  }
+}
+```
+
+Requirements: Backend must be running, and the Chrome extension side panel must be open (to establish the WebSocket bridge).
+
+| MCP Tool | Description |
+|----------|-------------|
+| `list_tabs` | List all browser tabs (with filters) |
+| `search_tabs` | Search tabs by keyword |
+| `get_tab_detail` | Get enriched tab details |
+| `close_tabs` | Close tabs by ID |
+| `categorize_tabs` | Trigger AI classification |
+| `detect_duplicates` | Find duplicate tabs |
+| `get_page_content` | Extract active page content |
+| `summarize_tab` | Get/generate AI summary |
+| `export_to_notes` | Export tab to Apple Notes |
+| `export_to_obsidian` | Export tab to Obsidian |
 
 ## API
 
+The backend exposes a minimal API surface:
+
 | Endpoint | Description |
 |----------|-------------|
-| `POST /api/tabs/sync` | Sync tabs from extension |
-| `POST /api/ai/classify` | SSE streaming classification |
-| `POST /api/ai/summarize/:id` | SSE streaming summary |
-| `POST /api/ai/chat` | Chat / Agent with tool calls |
+| `GET /api/health` | Health check (includes bridge connection status) |
 | `POST /api/export/single` | Export to Apple Notes / Obsidian |
-| `GET /api/duplicates/detect` | Duplicate detection |
-| `GET /api/health` | Health check |
+| `GET /api/export/targets` | Check available export targets |
+| `GET /api/export/folders/apple-notes` | List Apple Notes folders |
+| `GET /api/export/folders/obsidian` | List Obsidian vault folders |
+| `ws://…/ws/bridge` | WebSocket bridge for MCP ↔ Extension |
 
 ## CI/CD
 

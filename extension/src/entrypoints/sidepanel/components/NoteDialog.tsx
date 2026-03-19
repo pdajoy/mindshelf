@@ -15,6 +15,7 @@ import {
   Zap, Link, Tag, FolderOpen, FileDown,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 
 interface NoteDialogProps {
   tab: TabRecord;
@@ -22,6 +23,7 @@ interface NoteDialogProps {
 }
 
 export function NoteDialog({ tab, onClose }: NoteDialogProps) {
+  const { t } = useT();
   const settings = useSettingsStore();
   const { fetchTabs } = useTabStore();
   const backendAvailable = getBackendAvailable();
@@ -89,20 +91,20 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
 
   const buildFromCache = () => {
     const lines: string[] = [];
-    if (tab.ai_summary) lines.push('## 摘要\n', tab.ai_summary, '');
-    if (tab.content_text) lines.push('---\n', '## 内容\n', tab.content_text.substring(0, 20000));
-    if (!lines.length) lines.push('暂无内容');
+    if (tab.ai_summary) lines.push(`## ${t('note.summary')}\n`, tab.ai_summary, '');
+    if (tab.content_text) lines.push('---\n', `## ${t('note.content')}\n`, tab.content_text.substring(0, 20000));
+    if (!lines.length) lines.push(t('note.noContent'));
     setMarkdown(lines.join('\n'));
   };
 
   const buildMarkdown = (pc: PageContent) => {
     const lines: string[] = [];
-    if (tab.ai_summary) lines.push('## 摘要\n', tab.ai_summary, '');
+    if (tab.ai_summary) lines.push(`## ${t('note.summary')}\n`, tab.ai_summary, '');
     if (pc.markdown) {
       if (lines.length) lines.push('---\n');
-      lines.push('## 内容\n', pc.markdown.substring(0, 30000));
+      lines.push(`## ${t('note.content')}\n`, pc.markdown.substring(0, 30000));
     }
-    if (!lines.length) lines.push(pc.plainText || '暂无内容');
+    if (!lines.length) lines.push(pc.plainText || t('note.noContent'));
     setMarkdown(lines.join('\n'));
   };
 
@@ -203,7 +205,7 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
     tab.topic && { icon: <FolderOpen className="h-2.5 w-2.5" />, text: tab.topic },
     tags.length > 0 && { icon: <Tag className="h-2.5 w-2.5" />, text: tags.slice(0, 3).map(t => `#${t}`).join(' ') },
     tab.user_score && { icon: null, text: `${tab.user_score}/10` },
-    pageContent && { icon: null, text: `${pageContent.wordCount} 字 · ${pageContent.extractedBy}` },
+    pageContent && { icon: null, text: `${t('note.words', { count: pageContent.wordCount })} · ${pageContent.extractedBy}` },
   ].filter(Boolean) as Array<{ icon: React.ReactNode; text: string }>;
 
   return createPortal(
@@ -213,7 +215,7 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         <div className="flex items-center gap-2.5 min-w-0">
           <span className="text-lg">📝</span>
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold truncate leading-tight">保存为笔记</h3>
+            <h3 className="text-sm font-semibold truncate leading-tight">{t('note.title')}</h3>
             <p className="text-[10px] text-muted-foreground truncate max-w-[240px] mt-0.5">{tab.title}</p>
           </div>
         </div>
@@ -234,9 +236,9 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         {/* Settings Row */}
         <section className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">提取方式</label>
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t('note.extractMethod')}</label>
             <div className="flex gap-1">
-              {([['defuddle', 'Defuddle'], ['readability', 'Reader'], ['innerText', '纯文本']] as [ExtractorType, string][]).map(([v, l]) => (
+              {([['defuddle', 'Defuddle'], ['readability', 'Reader'], ['innerText', t('note.plainText')]] as [ExtractorType, string][]).map(([v, l]) => (
                 <button key={v} onClick={() => { setExtractor(v); setContentEdited(false); }} className={cn('flex-1 h-7 rounded-md text-[10px] transition-all', extractor === v ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80')}>
                   {l}
                 </button>
@@ -244,7 +246,7 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">文件夹</label>
+            <label className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">{t('note.folderLabel')}</label>
             <input type="text" value={folder} onChange={e => setFolder(e.target.value)} list="note-folder-list" className="w-full h-7 px-2 text-xs rounded-md border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
             <datalist id="note-folder-list">{folders.map(f => <option key={f} value={f} />)}</datalist>
           </div>
@@ -268,15 +270,15 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         <section className="space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <label className="text-xs font-semibold">笔记内容</label>
-              {contentEdited && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">已编辑</span>}
+              <label className="text-xs font-semibold">{t('note.noteContent')}</label>
+              {contentEdited && <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 font-medium">{t('note.edited')}</span>}
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setIsEditing(!isEditing)} className={cn('flex items-center gap-1 px-2 py-1 rounded-md text-[10px] transition-all', isEditing ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted')}>
                 {isEditing ? <Eye className="h-3 w-3" /> : <Edit3 className="h-3 w-3" />}
-                {isEditing ? '预览' : '编辑'}
+                {isEditing ? t('note.preview') : t('note.edit')}
               </button>
-              <button onClick={() => { setContentEdited(false); if (htmlRef.current) runExtraction(htmlRef.current, extractor); else buildFromCache(); }} disabled={extracting} className="p-1 rounded-md text-muted-foreground hover:bg-muted" title="重新提取">
+              <button onClick={() => { setContentEdited(false); if (htmlRef.current) runExtraction(htmlRef.current, extractor); else buildFromCache(); }} disabled={extracting} className="p-1 rounded-md text-muted-foreground hover:bg-muted" title={t('note.reExtract')}>
                 {extracting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
               </button>
             </div>
@@ -287,11 +289,11 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
             ) : (
               <div className="max-h-[400px] overflow-auto px-3 py-2.5">
                 {extracting ? (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-8 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> 提取内容中...</div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-8 justify-center"><Loader2 className="h-4 w-4 animate-spin" /> {t('note.extracting')}</div>
                 ) : markdown ? (
                   <MarkdownPreview content={markdown} className="text-xs" />
                 ) : (
-                  <p className="text-xs text-muted-foreground text-center py-8">暂无内容</p>
+                  <p className="text-xs text-muted-foreground text-center py-8">{t('note.noContent')}</p>
                 )}
               </div>
             )}
@@ -301,13 +303,13 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         {/* AI Optimization */}
         <section className="space-y-2">
           <button onClick={() => setShowAI(!showAI)} className="flex items-center gap-1.5 text-xs font-semibold text-primary/80 hover:text-primary transition-colors">
-            <Sparkles className="h-3.5 w-3.5" /> AI 优化笔记
+            <Sparkles className="h-3.5 w-3.5" /> {t('note.aiOptimize')}
             {showAI ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
           </button>
           {showAI && (
             <div className="space-y-2 p-3 rounded-lg bg-muted/20 border border-border/60">
               {!settings.isAIConfigured() && (
-                <p className="text-[10px] text-amber-600 dark:text-amber-400">请先在设置中配置 AI API Key</p>
+                <p className="text-[10px] text-amber-600 dark:text-amber-400">{t('note.configureAI')}</p>
               )}
               {settings.quickPrompts.length > 0 && (
                 <div className="flex gap-1.5 flex-wrap">
@@ -319,10 +321,10 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
                 </div>
               )}
               <div className="flex gap-2">
-                <input type="text" value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAIOptimize()} placeholder="自定义优化指令..." disabled={aiStreaming || !settings.isAIConfigured()} className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
+                <input type="text" value={aiInput} onChange={e => setAiInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAIOptimize()} placeholder={t('note.customInstruction')} disabled={aiStreaming || !settings.isAIConfigured()} className="flex-1 h-8 px-3 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary" />
                 <button onClick={handleAIOptimize} disabled={!aiInput.trim() || aiStreaming || !settings.isAIConfigured()} className="px-3 h-8 rounded-lg bg-primary text-primary-foreground text-xs disabled:opacity-50 flex items-center gap-1.5 shrink-0">
                   {aiStreaming ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
-                  优化
+                  {t('note.optimize')}
                 </button>
               </div>
               {aiHistory.length > 0 && (
@@ -339,7 +341,7 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
           <section>
             <label className="flex items-center gap-2.5 text-xs cursor-pointer select-none">
               <input type="checkbox" checked={closeAfterExport} onChange={e => setCloseAfterExport(e.target.checked)} className="h-3.5 w-3.5 accent-primary rounded" />
-              导出后关闭此标签页
+              {t('note.closeAfterExport')}
             </label>
           </section>
         )}
@@ -348,23 +350,23 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
         {result && (
           <div className={cn('flex items-center gap-2 rounded-lg p-2.5 text-xs', result.success ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400')}>
             {result.success ? <CheckCircle className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
-            {result.success ? (canReExport ? '已保存，内容已修改，可重新保存' : '笔记保存成功！') : `保存失败：${result.error}`}
+            {result.success ? (canReExport ? t('note.reExportHint') : t('note.saveSuccess')) : t('note.saveFailed', { error: result.error })}
           </div>
         )}
       </div>
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-border shrink-0 flex gap-2">
-        <button onClick={handleDownloadMD} disabled={!markdown} className="h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted disabled:opacity-50 flex items-center gap-1.5 shrink-0" title="下载 Markdown 文件">
+        <button onClick={handleDownloadMD} disabled={!markdown} className="h-9 px-3 rounded-lg border border-border text-xs text-muted-foreground hover:bg-muted disabled:opacity-50 flex items-center gap-1.5 shrink-0" title={t('note.downloadMd')}>
           <FileDown className="h-3.5 w-3.5" /> .md
         </button>
         {backendAvailable ? (
           <button onClick={handleExport} disabled={exporting || isExported} className={cn('flex-1 h-9 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all', isExported ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50')}>
-            {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> 保存中...</> : isExported ? <><CheckCircle className="h-4 w-4" /> 已保存</> : <><Download className="h-4 w-4" /> {result?.success ? '重新保存' : '导出笔记'}</>}
+            {exporting ? <><Loader2 className="h-4 w-4 animate-spin" /> {t('note.saving')}</> : isExported ? <><CheckCircle className="h-4 w-4" /> {t('note.saved')}</> : <><Download className="h-4 w-4" /> {result?.success ? t('note.reExport') : t('note.exportNote')}</>}
           </button>
         ) : (
           <button onClick={handleDownloadMD} disabled={!markdown} className="flex-1 h-9 rounded-lg bg-primary text-primary-foreground text-sm font-medium flex items-center justify-center gap-2 disabled:opacity-50">
-            <FileDown className="h-4 w-4" /> 下载 Markdown
+            <FileDown className="h-4 w-4" /> {t('note.downloadMd')}
           </button>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { streamChatMessage, type PageContext, type ChatStreamEvent } from '@/lib/ai-chat';
 import { useSettingsStore } from './settings-store';
+import i18next from 'i18next';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'tool_call' | 'tool_result';
@@ -83,7 +84,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   createSession: () => {
     const id = crypto.randomUUID();
-    const session: ChatSession = { id, title: '新对话', messages: [], createdAt: Date.now(), updatedAt: Date.now() };
+    const session: ChatSession = { id, title: i18next.t('chat.newChat'), messages: [], createdAt: Date.now(), updatedAt: Date.now() };
     const sessions = [session, ...get().sessions];
     set({ sessions, activeSessionId: id });
     saveSessions(sessions);
@@ -135,7 +136,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     try {
       const settings = useSettingsStore.getState();
       if (!settings.isAIConfigured()) {
-        appendToAssistant(sessionId!, '请先在设置中配置 AI 服务商和模型。');
+        appendToAssistant(sessionId!, i18next.t('chat.configureAIModel'));
         return;
       }
 

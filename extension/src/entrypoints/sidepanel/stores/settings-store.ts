@@ -24,6 +24,7 @@ interface SettingsState {
   activeProviderId: string;
   activeModel: string;
   maxAgentSteps: number;
+  language: 'auto' | 'zh' | 'en';
 
   backendUrl: string;
   theme: ThemeMode;
@@ -40,6 +41,7 @@ interface SettingsState {
   setActiveProvider: (id: string, model?: string) => void;
   setActiveModel: (model: string) => void;
   setMaxAgentSteps: (n: number) => void;
+  setLanguage: (lang: 'auto' | 'zh' | 'en') => void;
   setBackendUrl: (url: string) => void;
   setTheme: (theme: ThemeMode) => void;
   setDefaultExportTarget: (t: 'apple_notes' | 'obsidian') => void;
@@ -64,7 +66,7 @@ const DEFAULT_QUICK_PROMPTS: QuickPrompt[] = [
 const STORAGE_KEY = 'mindshelf_settings';
 const SYNC_KEYS = [
   'providers', 'activeProviderId', 'activeModel',
-  'maxAgentSteps', 'backendUrl', 'theme',
+  'maxAgentSteps', 'language', 'backendUrl', 'theme',
   'defaultExportTarget', 'defaultFolder', 'noteStyle',
   'customStylePrompt', 'defaultExtractor', 'quickPrompts',
 ] as const;
@@ -74,6 +76,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   activeProviderId: '',
   activeModel: '',
   maxAgentSteps: 5,
+  language: 'auto',
 
   backendUrl: 'http://127.0.0.1:3456',
   theme: 'system',
@@ -125,6 +128,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   setActiveModel: (model) => { set({ activeModel: model }); persist({ activeModel: model }); },
   setMaxAgentSteps: (v) => { set({ maxAgentSteps: v }); persist({ maxAgentSteps: v }); },
+  setLanguage: (v) => { set({ language: v }); persist({ language: v }); },
   setBackendUrl: (v) => { set({ backendUrl: v }); persist({ backendUrl: v }); },
   setTheme: (v) => { set({ theme: v }); applyTheme(v); persist({ theme: v }); },
   setDefaultExportTarget: (v) => { set({ defaultExportTarget: v }); persist({ defaultExportTarget: v }); },

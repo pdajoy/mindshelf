@@ -8,6 +8,7 @@ import type { SyncedTab } from '@/lib/types';
 import type { TabViewMode } from '../App';
 import { RefreshCw, Sparkles, Copy, Loader2, Settings, Sun, Moon, Monitor } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 
 interface HeaderProps {
   viewMode: TabViewMode;
@@ -15,6 +16,7 @@ interface HeaderProps {
 }
 
 export function Header({ viewMode, onViewModeChange }: HeaderProps) {
+  const { t } = useT();
   const { activePanel, setActivePanel, toggleSettings } = useNavStore();
   const { isScanning, syncTabs, tabs, setDuplicateGroups, duplicateGroups } = useTabStore();
   const { isClassifying, classifyProgress, startClassify, stopClassify } = useAIStore();
@@ -62,8 +64,8 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
       <div className="flex items-center px-2 py-1 gap-1 min-w-0">
         <div className="flex items-center gap-0.5 shrink-0">
           {([
-            { key: 'tabs' as Panel, label: '标签', badge: tabs.length, icon: '📑', tip: '浏览、分类、导出你的标签页' },
-            { key: 'chat' as Panel, label: 'AI Agent', badge: null, icon: '🤖', tip: 'AI 聊天与标签操作助手' },
+            { key: 'tabs' as Panel, label: t('header.tabs'), badge: tabs.length, icon: '📑', tip: t('header.tabsTip') },
+            { key: 'chat' as Panel, label: 'AI Agent', badge: null, icon: '🤖', tip: t('header.chatTip') },
           ]).map(({ key, label, badge, icon, tip }) => (
             <button
               key={key}
@@ -94,7 +96,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
                 )}
               >
                 <Sparkles className="h-3 w-3 shrink-0" />
-                {isClassifying ? '停止' : '分类'}
+                {isClassifying ? t('header.stop') : t('header.classify')}
               </button>
 
               <button
@@ -106,27 +108,27 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
                     ? 'bg-amber-500 text-white'
                     : 'bg-amber-100/80 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400',
                 )}
-                title="重复检测"
+                title={t('header.dedupTip')}
               >
                 {detectingDups ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3 shrink-0" />}
-                {duplicateGroups.length > 0 ? `${duplicateGroups.length}` : '去重'}
+                {duplicateGroups.length > 0 ? `${duplicateGroups.length}` : t('header.dedup')}
               </button>
 
               <button
                 onClick={handleScan}
                 disabled={isScanning}
                 className={cn('p-1 rounded-md transition-colors', isScanning ? 'text-primary animate-spin' : 'text-muted-foreground hover:bg-muted hover:text-foreground')}
-                title="扫描标签"
+                title={t('header.scanTabs')}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
               </button>
             </>
           )}
 
-          <button onClick={cycleTheme} className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title={`主题: ${theme}`}>
+          <button onClick={cycleTheme} className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title={`${t('header.theme')}: ${theme}`}>
             <ThemeIcon className="h-3.5 w-3.5" />
           </button>
-          <button onClick={toggleSettings} className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title="设置">
+          <button onClick={toggleSettings} className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground" title={t('header.settings')}>
             <Settings className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -135,7 +137,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
       {isClassifying && classifyProgress && (
         <div className="px-3 py-1.5 bg-amber-50 border-t border-amber-200 dark:bg-amber-900/20 dark:border-amber-800">
           <div className="flex items-center justify-between text-xs text-amber-700 dark:text-amber-400">
-            <span>阶段 {classifyProgress.stage}: {classifyProgress.stageName}</span>
+            <span>{t('header.stage')} {classifyProgress.stage}: {classifyProgress.stageName}</span>
             <span>{classifyProgress.processed}/{classifyProgress.total}</span>
           </div>
           <div className="mt-1 h-1 bg-amber-200 dark:bg-amber-800 rounded-full overflow-hidden">

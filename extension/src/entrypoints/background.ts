@@ -1,9 +1,11 @@
 import { MESSAGE_TYPES } from '@/lib/types';
+import { startBridgeClient } from '@/lib/ws-bridge-client';
 
 export default defineBackground(() => {
   console.log('[MindShelf] Background service worker started');
 
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
+  startBridgeClient();
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     switch (message.type) {

@@ -37,14 +37,15 @@ exportRouter.get('/folders/obsidian', async (_req, res) => {
 
 exportRouter.post('/single', async (req, res) => {
   try {
-    const { title, url, domain, topic, tags, userScore, content, target, folder } = req.body;
+    const { title, url, domain, topic, tags, userScore, content, target, folder, locale } = req.body;
     if (!title || !url || !target) return res.status(400).json({ error: 'title, url, and target required' });
 
     const result = await exportTab({
       title, url, domain, topic, tags, userScore,
-      content: content || '暂无内容',
+      content: content || '',
       target: target as ExportTarget,
       folder,
+      locale,
     });
 
     res.json(result);
@@ -54,7 +55,7 @@ exportRouter.post('/single', async (req, res) => {
 });
 
 exportRouter.post('/batch', async (req, res) => {
-  const { items, target, folder } = req.body;
+  const { items, target, folder, locale } = req.body;
   if (!Array.isArray(items) || !target) return res.status(400).json({ error: 'items array and target required' });
 
   res.writeHead(200, {
@@ -71,9 +72,10 @@ exportRouter.post('/batch', async (req, res) => {
       domain: item.domain,
       topic: item.topic,
       tags: item.tags,
-      content: item.content || '暂无内容',
+      content: item.content || '',
       target: target as ExportTarget,
       folder: item.folder || folder,
+      locale,
     }));
 
     const { successCount, failCount } = await batchExport(

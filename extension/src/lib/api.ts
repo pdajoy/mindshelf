@@ -1,5 +1,6 @@
 import { apiUrl } from './utils';
 import type { ExportTarget } from './types';
+import i18next from 'i18next';
 
 async function fetchJSON<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(apiUrl(path), {
@@ -44,7 +45,7 @@ export const api = {
       success: boolean; logId: string; targetId?: string; targetPath?: string; error?: string;
     }>('/api/export/single', {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ ...data, locale: i18next.language }),
     }),
   },
 };

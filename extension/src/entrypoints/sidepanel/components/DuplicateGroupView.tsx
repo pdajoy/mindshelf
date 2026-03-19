@@ -4,9 +4,11 @@ import { TabItem } from './TabItem';
 import type { TabRecord } from '@/lib/types';
 import { ChevronDown, ChevronRight, Copy, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 
 export function DuplicateGroupView() {
   const { duplicateGroups, tabs } = useTabStore();
+  const { t } = useT();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const toggleCollapse = (key: string) => {
@@ -23,8 +25,8 @@ export function DuplicateGroupView() {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
         <Copy className="h-8 w-8 text-muted-foreground/30 mb-2" />
-        <p className="text-sm text-muted-foreground font-medium">没有检测到重复标签</p>
-        <p className="text-xs text-muted-foreground/60 mt-1">所有标签都是唯一的</p>
+        <p className="text-sm text-muted-foreground font-medium">{t('duplicates.noDups')}</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">{t('duplicates.allUnique')}</p>
       </div>
     );
   }
@@ -32,9 +34,9 @@ export function DuplicateGroupView() {
   const totalDups = duplicateGroups.reduce((sum, g) => sum + g.tabs.length, 0);
 
   const reasonLabels: Record<string, string> = {
-    exact_url: 'URL 完全相同',
-    exact_title: '标题完全相同',
-    similar_title: '标题相似',
+    exact_url: t('duplicates.exactUrl'),
+    exact_title: t('duplicates.exactTitle'),
+    similar_title: t('duplicates.similarTitle'),
   };
 
   return (
@@ -44,13 +46,13 @@ export function DuplicateGroupView() {
           <div className="flex items-center gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
             <span className="text-xs font-medium text-amber-700">
-              {duplicateGroups.length} 组重复 · {totalDups} 个标签
+              {t('duplicates.groups', { count: duplicateGroups.length, total: totalDups })}
             </span>
           </div>
           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            <button onClick={expandAll} className="hover:text-foreground">展开</button>
+            <button onClick={expandAll} className="hover:text-foreground">{t('grouped.expand')}</button>
             <span>|</span>
-            <button onClick={collapseAll} className="hover:text-foreground">折叠</button>
+            <button onClick={collapseAll} className="hover:text-foreground">{t('grouped.collapse')}</button>
           </div>
         </div>
       </div>

@@ -1,6 +1,8 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
 import { getModel, type AIConfig } from './ai-client';
+import i18next from 'i18next';
+const tt = i18next.t.bind(i18next);
 
 export interface CategoryDef {
   name: string;
@@ -57,31 +59,31 @@ const TITLE_KEYWORDS: Record<string, RegExp> = {
   'business': /(融资|投资|商业|创业|startup|saas|revenue|估值|valuation|ipo|市场|market)/i,
 };
 
-const AI_CLASSIFY_SYSTEM = `你是一个智能网页标签分类专家。目标是将浏览器标签页精确归类到最合适的细分类别。
+const AI_CLASSIFY_SYSTEM = `You are an intelligent web page tab classification expert. Your goal is to accurately categorize browser tabs into the most appropriate sub-categories.
 
-可用类别（严格使用这些 ID）：
-- ai-ml: AI/机器学习
-- programming: 编程开发
-- devops: 运维/DevOps
-- security: 安全/逆向
-- networking: 网络/协议
-- research: 研究/学术
-- news: 新闻/资讯
-- design: 设计/创意
-- business: 商业/金融
-- entertainment: 娱乐/视频
-- social: 社交/论坛
-- shopping: 购物/电商
-- reference: 参考/文档
-- tools: 工具/服务
-- other: 其他
+Available categories (use these IDs strictly):
+- ai-ml: AI/Machine Learning
+- programming: Programming/Development
+- devops: DevOps/Infrastructure
+- security: Security/Reverse Engineering
+- networking: Networking/Protocols
+- research: Research/Academic
+- news: News/Media
+- design: Design/Creative
+- business: Business/Finance
+- entertainment: Entertainment/Video
+- social: Social/Forums
+- shopping: Shopping/E-commerce
+- reference: Reference/Documentation
+- tools: Tools/Services
+- other: Other
 
-关键分类原则：
-1. 看内容本质而非来源平台。GitHub上的AI项目→ai-ml，GitHub上的路由器固件→networking
-2. 技术博客/论坛根据文章具体主题分类，不要笼统归为 programming
-3. AI相关内容要仔细区分：prompt工程→ai-ml，用AI写代码的教程→programming
-4. 生成tags时要具体有意义，例如 ["C++", "编译器", "LLVM"] 而非泛泛的 ["tech", "code"]
-5. 使用json输出结果`;
+Key classification principles:
+1. Look at content substance, not source platform. An AI project on GitHub → ai-ml, router firmware on GitHub → networking
+2. Classify tech blogs/forums by the specific topic, don't broadly assign to programming
+3. Carefully distinguish AI content: prompt engineering → ai-ml, using AI to write code tutorial → programming
+4. Generate meaningful specific tags, e.g. ["C++", "Compiler", "LLVM"] not generic ["tech", "code"]
+5. Output results in JSON`;
 
 const classifyResultSchema = z.object({
   classifications: z.array(
@@ -129,7 +131,7 @@ export async function categorizeTabs(
   const results: Record<string, ClassifyResult> = {};
 
   // Phase 1: Domain grouping
-  onProgress?.({ stage: 1, stageName: '域名聚合', stageDesc: '按域名快速分组', processed: 0, total: tabs.length, pct: 0 });
+  onProgress?.({ stage: 1, stageName: tt('classify.domainGroup'), stageDesc: tt('classify.domainGroupDesc'), processed: 0, total: tabs.length, pct: 0 });
 
   const domainGroups: Record<string, TabInput[]> = {};
   for (const tab of tabs) {
@@ -144,13 +146,13 @@ export async function categorizeTabs(
     .map(([d, list]) => `${d}(${list.length})`);
 
   onProgress?.({
-    stage: 1, stageName: '域名聚合',
-    stageDesc: `发现 ${Object.keys(domainGroups).length} 个域名，重点来源：${topDomains.join('、') || '无'}`,
+    stage: 1, stageName: tt('classify.domainGroup'),
+    stageDesc: tt('classify.domainFound', { count: Object.keys(domainGroups).length, top: topDomains.join(', ') || '-' }),
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
   // Phase 2: Rule-based
-  onProgress?.({ stage: 2, stageName: '规则识别', stageDesc: '匹配已知平台和域名模式', processed: 0, total: tabs.length, pct: 0 });
+  onProgress?.({ stage: 2, stageName: tt('classify.ruleMatch'), stageDesc: tt('classify.ruleMatchDesc'), processed: 0, total: tabs.length, pct: 0 });
 
   const CONTENT_PLATFORMS = /juejin|segmentfault|csdn|cnblogs|jianshu|medium\.com|dev\.to|hashnode|zhihu|v2ex|reddit/i;
   let ruleMatched = 0;
@@ -173,13 +175,13 @@ export async function categorizeTabs(
   }
 
   onProgress?.({
-    stage: 2, stageName: '规则识别',
-    stageDesc: `${ruleMatched}/${tabs.length} 命中已知规则`,
+    stage: 2, stageName: tt('classify.ruleMatch'),
+    stageDesc: tt('classify.ruleHit', { matched: ruleMatched, total: tabs.length }),
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
   // Phase 3: Title keywords
-  onProgress?.({ stage: 3, stageName: '标题分析', stageDesc: '通过标题关键词判断类别', processed: 0, total: tabs.length, pct: 0 });
+  onProgress?.({ stage: 3, stageName: tt('classify.titleAnalysis'), stageDesc: tt('classify.titleAnalysisDesc'), processed: 0, total: tabs.length, pct: 0 });
 
   let titleMatched = 0;
   for (const tab of tabs) {
@@ -201,8 +203,8 @@ export async function categorizeTabs(
   }
 
   onProgress?.({
-    stage: 3, stageName: '标题分析',
-    stageDesc: `标题语义补全 ${titleMatched} 个标签，累计已分类 ${Object.keys(results).length}`,
+    stage: 3, stageName: tt('classify.titleAnalysis'),
+    stageDesc: tt('classify.titleDone', { matched: titleMatched, total: Object.keys(results).length }),
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
@@ -213,7 +215,7 @@ export async function categorizeTabs(
     const batchSize = 30;
     const totalBatches = Math.ceil(needsAI.length / batchSize);
 
-    onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: `${needsAI.length} 个标签需要AI判断`, processed: 0, total: needsAI.length, pct: 0 });
+    onProgress?.({ stage: 4, stageName: tt('classify.aiDeep'), stageDesc: tt('classify.aiDeepDesc', { count: needsAI.length }), processed: 0, total: needsAI.length, pct: 0 });
 
     const model = getModel(config);
 
@@ -222,8 +224,8 @@ export async function categorizeTabs(
       const batch = needsAI.slice(i, i + batchSize);
 
       onProgress?.({
-        stage: 4, stageName: 'AI 深度分析',
-        stageDesc: `批次 ${batchNum}/${totalBatches}：分析 URL + 标题 + 内容摘要`,
+        stage: 4, stageName: tt('classify.aiDeep'),
+        stageDesc: tt('classify.aiBatch', { batch: batchNum, total: totalBatches }),
         processed: i, total: needsAI.length, pct: Math.round((i / needsAI.length) * 100),
       });
 
@@ -269,13 +271,13 @@ export async function categorizeTabs(
       }
     }
 
-    onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: 'AI 分析完成', processed: needsAI.length, total: needsAI.length, pct: 100 });
+    onProgress?.({ stage: 4, stageName: tt('classify.aiDeep'), stageDesc: tt('classify.aiDone'), processed: needsAI.length, total: needsAI.length, pct: 100 });
   } else {
-    onProgress?.({ stage: 4, stageName: 'AI 深度分析', stageDesc: '所有标签已通过规则和标题分类，跳过AI', processed: 0, total: 0, pct: 100 });
+    onProgress?.({ stage: 4, stageName: tt('classify.aiDeep'), stageDesc: tt('classify.aiSkip'), processed: 0, total: 0, pct: 100 });
   }
 
   // Phase 5: Consolidation
-  onProgress?.({ stage: 5, stageName: '整合修正', stageDesc: '交叉验证并合并分类结果', processed: 0, total: tabs.length, pct: 0 });
+  onProgress?.({ stage: 5, stageName: tt('classify.consolidate'), stageDesc: tt('classify.consolidateDesc'), processed: 0, total: tabs.length, pct: 0 });
 
   for (const tab of tabs) {
     if (!results[tab.id]) {
@@ -300,8 +302,8 @@ export async function categorizeTabs(
   };
 
   onProgress?.({
-    stage: 5, stageName: '整合修正',
-    stageDesc: `分类完成 · 平均置信度 ${stats.avgConfidence}% · 画像倾向 ${profileHint}`,
+    stage: 5, stageName: tt('classify.consolidate'),
+    stageDesc: tt('classify.consolidateDone', { confidence: stats.avgConfidence, profile: profileHint }),
     processed: tabs.length, total: tabs.length, pct: 100,
   });
 
@@ -347,16 +349,16 @@ function generateBasicTags(tab: TabInput, _category: string): string[] {
 }
 
 function inferProfileHint(catCounts: Record<string, number>, total: number): string {
-  if (!total) return '未知';
+  if (!total) return tt('profile.unknown');
   const pct = (id: string) => (catCounts[id] || 0) / total;
   const techTotal = pct('programming') + pct('ai-ml') + pct('devops') + pct('security') + pct('networking');
-  if (pct('ai-ml') > 0.25) return 'AI研究型';
-  if (pct('security') > 0.2) return '安全研究型';
-  if (techTotal > 0.5 && pct('research') > 0.1) return '技术研究型';
-  if (techTotal > 0.5) return '工程实践型';
-  if (pct('design') > 0.25) return '创意设计型';
-  if (pct('business') > 0.25) return '商业决策型';
-  if (pct('news') + pct('social') > 0.45) return '资讯追踪型';
-  if (pct('reference') > 0.3) return '资料归档型';
-  return '综合探索型';
+  if (pct('ai-ml') > 0.25) return tt('profile.aiResearch');
+  if (pct('security') > 0.2) return tt('profile.security');
+  if (techTotal > 0.5 && pct('research') > 0.1) return tt('profile.techResearch');
+  if (techTotal > 0.5) return tt('profile.engineering');
+  if (pct('design') > 0.25) return tt('profile.design');
+  if (pct('business') > 0.25) return tt('profile.business');
+  if (pct('news') + pct('social') > 0.45) return tt('profile.news');
+  if (pct('reference') > 0.3) return tt('profile.archive');
+  return tt('profile.explore');
 }

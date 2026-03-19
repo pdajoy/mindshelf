@@ -8,8 +8,10 @@ import type { TabRecord } from '@/lib/types';
 import { Plus, Trash2, Send, Loader2, MessageSquare, User, Bot, FileEdit, ExternalLink, ChevronDown, ChevronUp, Wrench, Zap, Command, Globe, Square } from 'lucide-react';
 import { useSettingsStore } from '../stores/settings-store';
 import { cn } from '@/lib/utils';
+import { useT } from '@/lib/i18n';
 
 function CollapsibleUserMessage({ content }: { content: string }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
   const isLong = content.length > 200;
   if (!isLong) return <p className="text-xs whitespace-pre-wrap">{content}</p>;
@@ -17,13 +19,14 @@ function CollapsibleUserMessage({ content }: { content: string }) {
     <div className="text-xs">
       <p className="whitespace-pre-wrap">{expanded ? content : content.substring(0, 150) + '...'}</p>
       <button onClick={() => setExpanded(!expanded)} className="mt-1 flex items-center gap-0.5 text-[10px] opacity-70 hover:opacity-100">
-        {expanded ? <><ChevronUp className="h-2.5 w-2.5" /> 收起</> : <><ChevronDown className="h-2.5 w-2.5" /> 展开全部 ({content.length}字)</>}
+        {expanded ? <><ChevronUp className="h-2.5 w-2.5" /> {t('chat.collapseMore')}</> : <><ChevronDown className="h-2.5 w-2.5" /> {t('chat.expandAll', { count: content.length })}</>}
       </button>
     </div>
   );
 }
 
 function CollapsibleThinking({ content }: { content: string }) {
+  const { t } = useT();
   const [expanded, setExpanded] = useState(false);
   const thinkBlocks: string[] = [];
   const regex = /<think>([\s\S]*?)<\/think>/g;
@@ -38,7 +41,7 @@ function CollapsibleThinking({ content }: { content: string }) {
     <div>
       <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-muted-foreground mb-1">
         {expanded ? <ChevronUp className="h-2.5 w-2.5" /> : <ChevronDown className="h-2.5 w-2.5" />}
-        思考过程{thinkBlocks.length > 1 ? ` (${thinkBlocks.length})` : ''}
+        {t('chat.thinkingProcess')}{thinkBlocks.length > 1 ? ` (${thinkBlocks.length})` : ''}
       </button>
       {expanded && <div className="mb-2 pl-2 border-l-2 border-muted text-[11px] text-muted-foreground/70"><MarkdownPreview content={allThinking} /></div>}
       {rest && <MarkdownPreview content={rest} />}
@@ -47,15 +50,16 @@ function CollapsibleThinking({ content }: { content: string }) {
 }
 
 function ToolCallCard({ name, display, status, collapsed, onToggle }: { name: string; display?: string; status: 'calling' | 'done'; collapsed?: boolean; onToggle?: () => void }) {
+  const { t } = useT();
   const toolLabels: Record<string, string> = {
-    search_tabs: '搜索标签',
-    list_tabs_summary: '标签概况',
-    save_note: '保存笔记',
-    close_tabs: '关闭标签',
-    classify_tab: '分类标签',
-    get_tab_detail: '查看详情',
-    get_page_content: '获取页面内容',
-    detect_duplicates: '重复检测',
+    search_tabs: t('tool.searchTabs'),
+    list_tabs_summary: t('tool.tabsSummary'),
+    save_note: t('tool.saveNote'),
+    close_tabs: t('tool.closeTabs'),
+    classify_tab: t('tool.classifyTab'),
+    get_tab_detail: t('tool.tabDetail'),
+    get_page_content: t('tool.pageContent'),
+    detect_duplicates: t('tool.detectDups'),
   };
   return (
     <div className="rounded-md bg-muted/30 border border-border/30 text-[10px] overflow-hidden">
@@ -76,11 +80,12 @@ function ModelSelector() {
   const { providers, activeProviderId, activeModel, setActiveProvider, setActiveModel } = useSettingsStore();
   const [open, setOpen] = useState(false);
   const activeProvider = providers.find(p => p.id === activeProviderId);
-  if (!providers.length) return <span className="text-[10px] text-muted-foreground/50">未配置模型</span>;
+  const { t } = useT();
+  if (!providers.length) return <span className="text-[10px] text-muted-foreground/50">{t('chat.noModel')}</span>;
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)} className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-muted-foreground hover:bg-muted border border-transparent hover:border-border transition-colors max-w-[160px]">
-        <span className="truncate">{activeModel || '选择模型'}</span>
+        <span className="truncate">{activeModel || t('chat.selectModel')}</span>
         <ChevronDown className="h-2.5 w-2.5 shrink-0" />
       </button>
       {open && (
@@ -108,6 +113,7 @@ function ModelSelector() {
 }
 
 export function ChatPanel() {
+  const { t } = useT();
   const {
     sessions, activeSessionId, isStreaming, agentMode, pageContext,
     createSession, selectSession, deleteSession, sendMessage, stopStreaming, setAgentMode, setPageContext,
@@ -159,7 +165,7 @@ export function ChatPanel() {
   const handleSummarizeTab = async (tab: typeof tabs[0]) => {
     if (!useSettingsStore.getState().isAIConfigured()) {
       createSession();
-      setTimeout(() => sendMessage('请先在设置中配置 AI 服务商。'), 100);
+      setTimeout(() => sendMessage(t('chat.configureFirst')), 100);
       return;
     }
 
@@ -185,7 +191,7 @@ export function ChatPanel() {
     const sessionId = createSession();
     useChatStore.setState(state => ({
       sessions: state.sessions.map(s =>
-        s.id === sessionId ? { ...s, title: `摘要: ${tab.title.substring(0, 20)}` } : s
+        s.id === sessionId ? { ...s, title: `${t('chat.summaryPrefix')}: ${tab.title.substring(0, 20)}` } : s
       ),
     }));
 
@@ -197,7 +203,7 @@ export function ChatPanel() {
       contentExcerpt: contentText.substring(0, 6000),
     });
 
-    await sendMessage('总结当前页面的核心内容');
+    await sendMessage(t('chat.summarizePrompt'));
   };
 
   const handleSend = async () => {
@@ -340,7 +346,7 @@ export function ChatPanel() {
           {showThinking && (
             <div className="rounded-lg px-2.5 py-1.5 bg-muted/50 border border-border/50">
               <div className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
-                <Loader2 className="h-3 w-3 animate-spin" /> 思考中...
+                <Loader2 className="h-3 w-3 animate-spin" /> {t('chat.thinking')}
               </div>
             </div>
           )}
@@ -389,11 +395,11 @@ export function ChatPanel() {
         <div className="absolute inset-0 z-20 flex">
           <div className="w-64 bg-background border-r border-border flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-              <span className="text-xs font-semibold">对话历史</span>
-              <button onClick={handleNewChat} className="p-1 rounded hover:bg-muted" title="新对话"><Plus className="h-3.5 w-3.5" /></button>
+              <span className="text-xs font-semibold">{t('chat.chatHistory')}</span>
+              <button onClick={handleNewChat} className="p-1 rounded hover:bg-muted" title={t('chat.newChat')}><Plus className="h-3.5 w-3.5" /></button>
             </div>
             <div className="flex-1 overflow-auto">
-              {sessions.length === 0 && <div className="p-4 text-xs text-muted-foreground text-center">暂无对话</div>}
+              {sessions.length === 0 && <div className="p-4 text-xs text-muted-foreground text-center">{t('chat.noChats')}</div>}
               {sessions.map(s => (
                 <div
                   key={s.id}
@@ -418,10 +424,10 @@ export function ChatPanel() {
 
       {/* Chat Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border/50 shrink-0">
-        <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 rounded hover:bg-muted text-muted-foreground" title="对话历史">
+        <button onClick={() => setShowSidebar(!showSidebar)} className="p-1 rounded hover:bg-muted text-muted-foreground" title={t('chat.chatHistory')}>
           <MessageSquare className="h-4 w-4" />
         </button>
-        <span className="text-xs font-medium truncate flex-1">{activeSession?.title || '新对话'}</span>
+        <span className="text-xs font-medium truncate flex-1">{activeSession?.title || t('chat.newChat')}</span>
         {pageContext && (
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/50 text-[9px] text-muted-foreground max-w-[120px]" title={`当前页面上下文已注入: ${pageContext.title}`}>
             <Globe className="h-2.5 w-2.5 shrink-0 text-primary/60" />
@@ -430,7 +436,7 @@ export function ChatPanel() {
           </div>
         )}
         <button onClick={handleNewChat} className="flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-primary/10 text-primary hover:bg-primary/20">
-          <Plus className="h-3 w-3" /> 新对话
+          <Plus className="h-3 w-3" /> {t('chat.newChat')}
         </button>
       </div>
 
@@ -441,13 +447,13 @@ export function ChatPanel() {
             <Bot className="h-8 w-8 text-muted-foreground/30 mb-2" />
             {!aiConfigured ? (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                请先在设置中配置 AI 服务商
+                {t('chat.configureProvider')}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground/50 mt-1">
                 {agentMode
-                  ? 'Agent 模式 — 可以搜索、关闭、分类标签'
-                  : '随时问我关于标签和页面内容的问题'}
+                  ? t('chat.agentHint')
+                  : t('chat.chatHint')}
               </p>
             )}
             {pageContext && (
@@ -458,16 +464,16 @@ export function ChatPanel() {
                   <div className="text-[10px] text-muted-foreground truncate">{pageContext.title}</div>
                   <div className="text-[9px] text-muted-foreground/50 truncate">{pageContext.domain}</div>
                 </div>
-                <span className="text-[9px] text-primary/60 shrink-0 ml-1">已注入上下文</span>
+                <span className="text-[9px] text-primary/60 shrink-0 ml-1">{t('chat.contextInjected')}</span>
                 <button onClick={() => setPageContext(null)} className="shrink-0 text-muted-foreground/40 hover:text-muted-foreground text-[10px] ml-1">&times;</button>
               </div>
             )}
             <div className="mt-4 space-y-1 w-full max-w-[280px]">
               {[
-                { icon: '📝', text: '总结当前页面的核心内容' },
-                { icon: '🏷️', text: '我的标签有哪些分类？' },
-                { icon: '🔄', text: '有哪些重复标签可以清理？' },
-                { icon: '💡', text: '推荐我应该优先阅读哪些标签' },
+                { icon: '📝', text: t('chat.quickSummarize') },
+                { icon: '🏷️', text: t('chat.quickCategories') },
+                { icon: '🔄', text: t('chat.quickDuplicates') },
+                { icon: '💡', text: t('chat.quickRecommend') },
               ].map(q => (
                 <button key={q.text} onClick={() => setInput(q.text)} className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left rounded-lg border border-border/60 hover:bg-muted/50 hover:border-primary/30 transition-colors">
                   <span>{q.icon}</span>
@@ -487,11 +493,11 @@ export function ChatPanel() {
             <img src={contextTab.favicon_url || `https://www.google.com/s2/favicons?domain=${contextTab.domain}&sz=16`} className="h-3.5 w-3.5 rounded-sm shrink-0" alt="" />
             <span className="text-[10px] text-muted-foreground truncate flex-1">{contextTab.title}</span>
             <button onClick={() => setNoteTab(contextTab)} className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-primary/10 text-primary hover:bg-primary/20">
-              <FileEdit className="h-2.5 w-2.5" /> 保存笔记
+              <FileEdit className="h-2.5 w-2.5" /> {t('chat.saveNote')}
             </button>
             {contextTab.source_tab_id && (
               <button onClick={() => chrome.runtime.sendMessage({ type: 'ACTIVATE_TAB', tabId: contextTab.source_tab_id, windowId: contextTab.source_window_id })} className="flex items-center gap-1 px-2 py-1 rounded text-[10px] text-muted-foreground hover:bg-muted">
-                <ExternalLink className="h-2.5 w-2.5" /> 跳转
+                <ExternalLink className="h-2.5 w-2.5" /> {t('chat.jump')}
               </button>
             )}
           </div>
@@ -537,7 +543,7 @@ export function ChatPanel() {
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-            placeholder={aiConfigured ? '输入消息... (Shift+Enter 换行)' : '请先配置 AI 服务商...'}
+            placeholder={aiConfigured ? t('chat.inputPlaceholder') : t('chat.configPlaceholder')}
             disabled={isStreaming || !aiConfigured}
             rows={input.split('\n').length > 3 ? 4 : input.includes('\n') ? 2 : 1}
             className="flex-1 min-h-[32px] max-h-24 px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"

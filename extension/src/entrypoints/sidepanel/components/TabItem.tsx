@@ -6,10 +6,10 @@ import { useNavStore } from '../stores/nav-store';
 import { ScoreRating } from './ScoreRating';
 import { NoteDialog } from './NoteDialog';
 import { X, ExternalLink, Sparkles, FileEdit } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 interface TabItemProps {
   tab: TabRecord;
-  style?: React.CSSProperties;
 }
 
 const topicColors: Record<string, string> = {
@@ -30,7 +30,8 @@ const topicColors: Record<string, string> = {
   'other': 'bg-gray-100 text-gray-600 dark:bg-gray-800/30 dark:text-gray-400',
 };
 
-export function TabItem({ tab, style }: TabItemProps) {
+export function TabItem({ tab }: TabItemProps) {
+  const { t } = useT();
   const { selectedIds, toggleSelect } = useTabStore();
   const { requestSummarize } = useNavStore();
   const [showNote, setShowNote] = useState(false);
@@ -53,9 +54,8 @@ export function TabItem({ tab, style }: TabItemProps) {
   return (
     <div
       data-tab-id={tab.id}
-      style={style}
       className={cn(
-        'group flex items-start gap-2.5 px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors',
+        'group flex items-start gap-2 px-2.5 py-2 border-b border-border/50 hover:bg-muted/50 transition-colors',
         isSelected && 'bg-primary/5',
       )}
     >
@@ -75,7 +75,7 @@ export function TabItem({ tab, style }: TabItemProps) {
         }}
       />
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 overflow-hidden">
         <div
           className="text-sm font-medium leading-snug truncate cursor-pointer hover:text-primary"
           onClick={handleActivate}
@@ -84,32 +84,32 @@ export function TabItem({ tab, style }: TabItemProps) {
           {truncate(tab.title, 60)}
         </div>
 
-        <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
-          <span className="truncate max-w-[120px] cursor-default" title={tab.url}>{formatDomain(tab.url)}</span>
+        <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground flex-wrap">
+          <span className="truncate max-w-[100px] cursor-default" title={tab.url}>{formatDomain(tab.url)}</span>
           <span>·</span>
-          <span>{timeAgo(tab.scanned_at)}</span>
+          <span className="shrink-0">{timeAgo(tab.scanned_at)}</span>
           {tab.topic && (
             <>
               <span>·</span>
-              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-medium', topicClass)}>
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-medium shrink-0', topicClass)}>
                 {tab.topic}
               </span>
             </>
           )}
           {tab.user_score && (
-            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">⭐{tab.user_score}</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 shrink-0">⭐{tab.user_score}</span>
           )}
         </div>
 
         {tab.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
-            {tab.tags.slice(0, 4).map((tag) => (
-              <span key={tag} className="px-1.5 py-0.5 text-[10px] bg-muted rounded-md text-muted-foreground">
+            {tab.tags.slice(0, 3).map((tag) => (
+              <span key={tag} className="px-1.5 py-0.5 text-[10px] bg-muted rounded-md text-muted-foreground truncate max-w-[80px]">
                 {tag}
               </span>
             ))}
-            {tab.tags.length > 4 && (
-              <span className="text-[10px] text-muted-foreground">+{tab.tags.length - 4}</span>
+            {tab.tags.length > 3 && (
+              <span className="text-[10px] text-muted-foreground shrink-0">+{tab.tags.length - 3}</span>
             )}
           </div>
         )}
@@ -125,28 +125,28 @@ export function TabItem({ tab, style }: TabItemProps) {
         <button
           onClick={() => requestSummarize(tab.id)}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-          title="AI 摘要"
+          title={t('tabItem.aiSummary')}
         >
           <Sparkles className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={() => setShowNote(true)}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-          title="保存为笔记"
+          title={t('tabItem.saveNote')}
         >
           <FileEdit className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={handleActivate}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
-          title="跳转标签"
+          title={t('tabItem.jumpTab')}
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </button>
         <button
           onClick={handleClose}
           className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
-          title="关闭标签"
+          title={t('tabItem.closeTab')}
         >
           <X className="h-3.5 w-3.5" />
         </button>

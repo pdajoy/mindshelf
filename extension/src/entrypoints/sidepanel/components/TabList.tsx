@@ -4,24 +4,26 @@ import { useFilteredTabs } from '../stores/tab-store';
 import { useNavStore } from '../stores/nav-store';
 import { TabItem } from './TabItem';
 import { flashWhenStable } from '@/lib/scroll-flash';
+import { useT } from '@/lib/i18n';
 
 export function TabList() {
   const tabs = useFilteredTabs();
   const { pendingLocateTabId, clearPendingLocate } = useNavStore();
   const parentRef = useRef<HTMLDivElement>(null);
 
+  const { t } = useT();
   const { showToast } = useNavStore();
 
   useEffect(() => {
     if (!pendingLocateTabId) return;
     clearPendingLocate();
     if (pendingLocateTabId === '__not_found__') {
-      showToast('当前标签不在列表中');
+      showToast(t('tabList.notInList'));
       return;
     }
     const idx = tabs.findIndex(t => t.id === pendingLocateTabId);
     if (idx < 0) {
-      showToast('当前标签不在已过滤的列表中');
+      showToast(t('tabList.notInFiltered'));
       return;
     }
     virtualizer.scrollToIndex(idx, { align: 'center', behavior: 'smooth' });
@@ -31,16 +33,17 @@ export function TabList() {
   const virtualizer = useVirtualizer({
     count: tabs.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 72,
+    estimateSize: () => 80,
     overscan: 10,
+    measureElement: (el) => el.getBoundingClientRect().height,
   });
 
   if (tabs.length === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground p-8">
         <div className="text-center">
-          <p className="text-lg font-medium text-foreground/60">No tabs found</p>
-          <p className="mt-1">Try scanning your browser tabs first</p>
+          <p className="text-lg font-medium text-foreground/60">{t('tabList.noTabs')}</p>
+          <p className="mt-1">{t('tabList.scanFirst')}</p>
         </div>
       </div>
     );
@@ -58,18 +61,20 @@ export function TabList() {
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const tab = tabs[virtualRow.index];
           return (
-            <TabItem
+            <div
               key={tab.id}
-              tab={tab}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
               style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
-                height: `${virtualRow.size}px`,
                 transform: `translateY(${virtualRow.start}px)`,
               }}
-            />
+            >
+              <TabItem tab={tab} />
+            </div>
           );
         })}
       </div>

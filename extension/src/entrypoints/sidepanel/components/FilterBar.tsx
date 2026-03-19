@@ -4,6 +4,7 @@ import { useTabStore, useTopics } from '../stores/tab-store';
 import { useNavStore } from '../stores/nav-store';
 import type { TabViewMode } from '../App';
 import { Search, X, List, LayoutGrid, Crosshair } from 'lucide-react';
+import { useT } from '@/lib/i18n';
 
 interface FilterBarProps {
   viewMode: TabViewMode;
@@ -11,6 +12,7 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ viewMode, onViewModeChange }: FilterBarProps) {
+  const { t } = useT();
   const { filter, setFilter, topicFilter, setTopicFilter, searchQuery, setSearchQuery, tabs } = useTabStore();
   const { requestLocate } = useNavStore();
   const topics = useTopics();
@@ -49,7 +51,6 @@ export function FilterBar({ viewMode, onViewModeChange }: FilterBarProps) {
 
   return (
     <div className="space-y-1.5 px-3 py-2">
-      {/* Search + View Toggle */}
       <div className="flex items-center gap-1.5">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -57,7 +58,7 @@ export function FilterBar({ viewMode, onViewModeChange }: FilterBarProps) {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索标签..."
+            placeholder={t('filter.searchPlaceholder')}
             className="w-full h-7 pl-8 pr-7 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary"
           />
           {searchQuery && (
@@ -70,28 +71,27 @@ export function FilterBar({ viewMode, onViewModeChange }: FilterBarProps) {
           <button
             onClick={() => onViewModeChange('list')}
             className={cn('p-1.5 rounded transition-colors', viewMode === 'list' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
-            title="列表视图"
+            title={t('filter.listView')}
           >
             <List className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => onViewModeChange('grouped')}
             className={cn('p-1.5 rounded transition-colors', viewMode === 'grouped' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground')}
-            title="分组视图"
+            title={t('filter.groupView')}
           >
             <LayoutGrid className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={locateActiveTab}
             className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="定位当前标签"
+            title={t('filter.locateTab')}
           >
             <Crosshair className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Unified topic/filter pills */}
       {viewMode !== 'duplicates' && (
         <div className="flex gap-1 flex-wrap">
           <button
@@ -101,7 +101,7 @@ export function FilterBar({ viewMode, onViewModeChange }: FilterBarProps) {
               isAllActive ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:bg-muted',
             )}
           >
-            全部 ({tabs.length})
+            {t('filter.all')} ({tabs.length})
           </button>
           {topics.map(({ topic, count }) => (
             <button
@@ -123,7 +123,7 @@ export function FilterBar({ viewMode, onViewModeChange }: FilterBarProps) {
                 isUnclassifiedActive ? 'bg-primary text-primary-foreground font-medium' : 'text-muted-foreground hover:bg-muted',
               )}
             >
-              未分类 ({unclassifiedCount})
+              {t('filter.unclassified')} ({unclassifiedCount})
             </button>
           )}
         </div>

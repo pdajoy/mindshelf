@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { useTabStore } from '@/entrypoints/sidepanel/stores/tab-store';
 import { getBackendAvailable } from './backend-status';
 import { api } from './api';
+import i18next from 'i18next';
+
+const t = i18next.t.bind(i18next);
 
 function getTabs() {
   return useTabStore.getState().tabs;
@@ -10,12 +13,12 @@ function getTabs() {
 
 export const agentTools = {
   search_tabs: tool({
-    description: '搜索标签。可按多个关键词（空格或逗号分隔）、分类、域名搜索。返回匹配的标签列表。',
+    description: 'Search tabs by multiple keywords (space or comma separated), category, or domain. Returns matching tab list.',
     inputSchema: z.object({
-      query: z.string().optional().describe('搜索关键词，支持多个（空格或逗号分隔），匹配标题、域名、摘要、标签'),
-      topic: z.string().optional().describe('按分类筛选（如 ai-ml, programming, security）'),
-      domain: z.string().optional().describe('按域名筛选'),
-      limit: z.number().optional().describe('返回数量限制，默认20'),
+      query: z.string().optional().describe('Search keywords (space/comma separated), matches title, domain, summary, tags'),
+      topic: z.string().optional().describe('Filter by category (e.g. ai-ml, programming, security)'),
+      domain: z.string().optional().describe('Filter by domain'),
+      limit: z.number().optional().describe('Result limit, default 20'),
     }),
     execute: async (args) => {
       let results = getTabs();
@@ -49,21 +52,23 @@ export const agentTools = {
       return {
         tabs: simplified,
         total,
-        display: `找到 ${total} 个标签${args.query ? `（关键词: ${args.query}）` : ''}`,
+        display: args.query
+          ? t('tool.foundWithKw', { count: total, keywords: args.query })
+          : t('tool.found', { count: total }),
       };
     },
   }),
 
   list_tabs_summary: tool({
-    description: '获取当前标签概况统计。包括总数、各分类数量。',
+    description: 'Get current tab overview statistics. Includes total count, category counts.',
     inputSchema: z.object({}),
     execute: async () => {
       const tabs = getTabs();
       const topicCounts: Record<string, number> = {};
       const domainCounts: Record<string, number> = {};
-      for (const t of tabs) {
-        if (t.topic) topicCounts[t.topic] = (topicCounts[t.topic] || 0) + 1;
-        domainCounts[t.domain] = (domainCounts[t.domain] || 0) + 1;
+      for (const tab of tabs) {
+        if (tab.topic) topicCounts[tab.topic] = (topicCounts[tab.topic] || 0) + 1;
+        domainCounts[tab.domain] = (domainCounts[tab.domain] || 0) + 1;
       }
       const topDomains = Object.entries(domainCounts)
         .sort((a, b) => b[1] - a[1])
@@ -73,16 +78,16 @@ export const agentTools = {
         total: tabs.length,
         byTopic: topicCounts,
         topDomains,
-        display: `共 ${tabs.length} 个标签，${Object.keys(topicCounts).length} 个分类`,
+        display: t('tool.totalTabs', { count: tabs.length, categories: Object.keys(topicCounts).length }),
       };
     },
   }),
 
   close_tabs: tool({
-    description: '关闭指定的标签页。传入标签ID数组。',
+    description: 'Close specified browser tabs. Pass an array of tab IDs.',
     inputSchema: z.object({
-      tabIds: z.array(z.string()).describe('要关闭的标签ID列表'),
-      reason: z.string().optional().describe('关闭原因'),
+      tabIds: z.array(z.string()).describe('Array of tab IDs to close'),
+      reason: z.string().optional().describe('Reason for closing'),
     }),
     execute: async (args) => {
       const allTabs = getTabs();
@@ -107,19 +112,19 @@ export const agentTools = {
       }
       return {
         closedCount,
-        display: `已关闭 ${closedCount} 个标签`,
+        display: t('tool.closed', { count: closedCount }),
       };
     },
   }),
 
   get_tab_detail: tool({
-    description: '获取指定标签的详细信息，包括摘要、分类、评分等。',
+    description: 'Get detailed information for a specific tab, including summary, category, score, etc.',
     inputSchema: z.object({
-      tabId: z.string().describe('标签ID'),
+      tabId: z.string().describe('Tab ID'),
     }),
     execute: async (args) => {
       const tab = getTabs().find((t) => t.id === args.tabId);
-      if (!tab) return { error: 'Tab not found', display: '未找到标签' };
+      if (!tab) return { error: 'Tab not found', display: t('tool.notFound') };
       return {
         id: tab.id,
         title: tab.title,
@@ -137,12 +142,12 @@ export const agentTools = {
   }),
 
   detect_duplicates: tool({
-    description: '检测当前标签中的重复项。返回重复标签组及原因（完全相同URL、相似标题等）。',
+    description: 'Detect duplicate tabs. Returns duplicate groups and reasons (exact URL match, similar title, etc.).',
     inputSchema: z.object({}),
     execute: async () => {
       const { detectDuplicates } = await import('@/lib/duplicate-detector');
       const groups = detectDuplicates(getTabs());
-      if (!groups.length) return { total: 0, groups: [], display: '未发现重复标签' };
+      if (!groups.length) return { total: 0, groups: [], display: t('tool.noDuplicates') };
       return {
         total: groups.length,
         totalDuplicateTabs: groups.reduce((s, g) => s + g.tabs.length, 0),
@@ -151,28 +156,28 @@ export const agentTools = {
           similarity: g.similarity,
           tabs: g.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
         })),
-        display: `发现 ${groups.length} 组重复标签（共 ${groups.reduce((s, g) => s + g.tabs.length, 0)} 个）`,
+        display: t('tool.duplicatesFound', { groups: groups.length, total: groups.reduce((s, g) => s + g.tabs.length, 0) }),
       };
     },
   }),
 
   get_page_content: tool({
-    description: '获取当前活跃页面的完整文本内容。用于需要深入分析或总结当前页面时。无需参数。',
+    description: 'Get the full text content of the currently active browser tab. Used when deep analysis or summary of the current page is needed. No args required.',
     inputSchema: z.object({}),
     execute: async () => {
       try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
         if (!tab?.id || tab.url?.startsWith('chrome://') || tab.url?.startsWith('chrome-extension://')) {
-          return { content: '', display: '无法获取页面内容（非网页标签）' };
+          return { content: '', display: t('tool.cannotGetContent') };
         }
 
         try {
           const result = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT_CS' });
           if (result?.content_text) {
             const content = result.content_text.substring(0, 8000);
-            return { title: tab.title, url: tab.url, content, display: `已获取页面内容（${content.length} 字）` };
+            return { title: tab.title, url: tab.url, content, display: t('tool.gotContent', { count: content.length }) };
           }
-        } catch { /* content script not ready */ }
+        } catch {}
 
         try {
           const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId: tab.id });
@@ -182,34 +187,34 @@ export const agentTools = {
             const text = extracted.plainText || extracted.markdown || '';
             if (text) {
               const content = text.substring(0, 8000);
-              return { title: tab.title, url: tab.url, content, display: `已获取页面内容（${content.length} 字）` };
+              return { title: tab.title, url: tab.url, content, display: t('tool.gotContent', { count: content.length }) };
             }
           }
-        } catch { /* html extraction failed */ }
+        } catch {}
 
-        return { content: '', display: '无法提取页面内容' };
+        return { content: '', display: t('tool.cannotExtract') };
       } catch {
-        return { content: '', display: '获取页面内容失败' };
+        return { content: '', display: t('tool.extractFailed') };
       }
     },
   }),
 
   save_note: tool({
-    description: '将指定标签保存为笔记到 Apple Notes 或 Obsidian（需要后端服务运行）。',
+    description: 'Save a specific tab as a note to Apple Notes or Obsidian (requires backend service running).',
     inputSchema: z.object({
-      tabId: z.string().describe('标签ID'),
-      target: z.enum(['apple_notes', 'obsidian']).describe('导出目标'),
-      folder: z.string().optional().describe('文件夹路径'),
+      tabId: z.string().describe('Tab ID'),
+      target: z.enum(['apple_notes', 'obsidian']).describe('Export target'),
+      folder: z.string().optional().describe('Folder path'),
     }),
     execute: async (args) => {
       if (!getBackendAvailable()) {
         return {
           success: false,
-          display: '⚠️ 后端服务未运行，无法导出。请使用界面上的"保存笔记"按钮下载 Markdown。',
+          display: t('tool.backendNotRunning'),
         };
       }
-      const tab = getTabs().find(t => t.id === args.tabId);
-      if (!tab) return { success: false, display: '❌ 未找到标签' };
+      const tab = getTabs().find(tab => tab.id === args.tabId);
+      if (!tab) return { success: false, display: `❌ ${t('tool.notFound')}` };
       try {
         const result = await api.export.single({
           title: tab.title,
@@ -217,18 +222,19 @@ export const agentTools = {
           domain: tab.domain,
           topic: tab.topic || undefined,
           tags: tab.tags,
-          content: tab.ai_summary || tab.content_text?.substring(0, 30000) || '暂无内容',
+          content: tab.ai_summary || tab.content_text?.substring(0, 30000) || 'No content',
           target: args.target,
           folder: args.folder,
         });
+        const targetLabel = args.target === 'obsidian' ? 'Obsidian' : 'Apple Notes';
         return {
           ...result,
           display: result.success
-            ? `✅ 已保存到 ${args.target === 'obsidian' ? 'Obsidian' : 'Apple Notes'}`
-            : `❌ 保存失败: ${result.error}`,
+            ? t('tool.savedTo', { target: targetLabel })
+            : t('tool.saveFailed', { error: result.error }),
         };
       } catch (e) {
-        return { success: false, display: `❌ 导出失败: ${(e as Error).message}` };
+        return { success: false, display: t('tool.exportFailed', { error: (e as Error).message }) };
       }
     },
   }),

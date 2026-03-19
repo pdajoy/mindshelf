@@ -1,23 +1,28 @@
 {
   "name": "mindshelf-backend",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "tsx src/index.ts",
-    "start:prod": "node dist/index.js"
+    "start:prod": "node dist/index.js",
+    "mcp:stdio": "tsx src/mcp/stdio.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
-    "marked": "^17.0.4"
+    "marked": "^17.0.4",
+    "ws": "^8.19.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
