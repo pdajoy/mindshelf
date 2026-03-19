@@ -99,7 +99,7 @@ export function DuplicateGroupView() {
                     const placeholder: TabRecord = {
                       id: gt.id, url: gt.url, canonical_url: gt.url, title: gt.title,
                       domain: (() => { try { return new URL(gt.url).hostname; } catch { return ''; } })(),
-                      favicon_url: '', topic: null, tags: [], ai_summary: null, ai_detailed_summary: null,
+                      favicon_url: '', topic: null, tags: [],
                       user_score: null, status: 'active', content_text: null,
                       language: null, word_count: null, source_tab_id: null,
                       source_window_id: null, scanned_at: gt.scannedAt, processed_at: null,

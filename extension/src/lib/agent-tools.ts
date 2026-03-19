@@ -25,7 +25,7 @@ export const agentTools = {
       if (args.query) {
         const keywords = args.query.split(/[,，\s]+/).filter(Boolean).map(k => k.toLowerCase());
         results = results.filter((t) => {
-          const hay = `${t.title} ${t.domain} ${t.ai_summary || ''} ${t.tags.join(' ')}`.toLowerCase();
+          const hay = `${t.title} ${t.domain} ${t.tags.join(' ')}`.toLowerCase();
           return keywords.some(k => hay.includes(k));
         });
       }
@@ -47,7 +47,6 @@ export const agentTools = {
         topic: t.topic,
         tags: t.tags,
         status: t.status,
-        ai_summary: t.ai_summary?.substring(0, 100),
       }));
       return {
         tabs: simplified,
@@ -133,7 +132,6 @@ export const agentTools = {
         topic: tab.topic,
         tags: tab.tags,
         status: tab.status,
-        ai_summary: tab.ai_summary,
         user_score: tab.user_score,
         content_text: tab.content_text?.substring(0, 500),
         display: `📑 ${tab.title}`,
@@ -222,7 +220,7 @@ export const agentTools = {
           domain: tab.domain,
           topic: tab.topic || undefined,
           tags: tab.tags,
-          content: tab.ai_summary || tab.content_text?.substring(0, 30000) || 'No content',
+          content: tab.content_text?.substring(0, 30000) || 'No content',
           target: args.target,
           folder: args.folder,
         });

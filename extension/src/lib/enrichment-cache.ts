@@ -10,7 +10,6 @@ const DEFAULT_TTL_DAYS = 60;
 export interface EnrichmentEntry {
   topic?: string | null;
   tags?: string[];
-  ai_summary?: string | null;
   user_score?: number | null;
   updatedAt: number; // epoch ms
 }
@@ -58,7 +57,7 @@ export async function saveEnrichment(url: string, data: Partial<Omit<EnrichmentE
 
 /** Batch save enrichments (after classify/sync) */
 export async function batchSaveEnrichments(
-  entries: Array<{ url: string; topic?: string | null; tags?: string[]; ai_summary?: string | null; user_score?: number | null }>
+  entries: Array<{ url: string; topic?: string | null; tags?: string[]; user_score?: number | null }>
 ): Promise<void> {
   const store = await loadStore();
   for (const entry of entries) {
@@ -67,7 +66,6 @@ export async function batchSaveEnrichments(
     store[key] = {
       topic: entry.topic ?? existing.topic,
       tags: entry.tags ?? existing.tags,
-      ai_summary: entry.ai_summary ?? existing.ai_summary,
       user_score: entry.user_score ?? existing.user_score,
       updatedAt: Date.now(),
     };

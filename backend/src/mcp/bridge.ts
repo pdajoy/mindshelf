@@ -49,7 +49,8 @@ export function mountWebSocketBridge(server: Server): void {
 
   wss.on('connection', (ws) => {
     if (extensionSocket && extensionSocket.readyState === WebSocket.OPEN) {
-      extensionSocket.close(1000, 'replaced');
+      ws.close(1000, 'already-connected');
+      return;
     }
     extensionSocket = ws;
     console.log('[Bridge] Extension connected');

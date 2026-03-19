@@ -106,7 +106,6 @@ async function dispatch(method: string, params: Record<string, unknown>): Promis
     case 'categorize_tabs': return handleCategorizeTabs(params);
     case 'detect_duplicates': return handleDetectDuplicates();
     case 'get_page_content': return handleGetPageContent();
-    case 'summarize_tab': return handleSummarizeTab(params);
     case 'get_tab_export_data': return handleGetTabExportData(params);
     default: throw new Error(`Unknown bridge method: ${method}`);
   }
@@ -127,9 +126,7 @@ async function handleListTabs() {
     domain: t.domain,
     topic: t.topic,
     tags: t.tags,
-    aiSummary: t.aiSummary,
     userScore: t.userScore,
-    lastAccessed: t.lastAccessed,
   }));
 }
 
@@ -141,7 +138,7 @@ async function handleSearchTabs(params: Record<string, unknown>) {
   const keywords = query.split(/[\s,]+/).filter(Boolean);
 
   return tabs.filter((t: any) => {
-    const text = `${t.title || ''} ${t.url || ''} ${t.domain || ''} ${t.topic || ''} ${t.aiSummary || ''} ${(t.tags || []).join(' ')}`.toLowerCase();
+    const text = `${t.title || ''} ${t.url || ''} ${t.domain || ''} ${t.topic || ''} ${(t.tags || []).join(' ')}`.toLowerCase();
     const matchesKeywords = !keywords.length || keywords.some((kw: string) => text.includes(kw));
     const matchesDomain = !domain || (t.domain || '').toLowerCase().includes(domain);
     const matchesTopic = !topic || (t.topic || '').toLowerCase().includes(topic);
@@ -213,14 +210,22 @@ async function handleGetPageContent() {
   }
 }
 
-async function handleSummarizeTab(_params: Record<string, unknown>) {
-  return { status: 'dispatched', message: 'Summarization must be triggered from the side panel UI' };
-}
-
 async function handleGetTabExportData(params: Record<string, unknown>) {
   const tabs = await getStoredTabs();
   const tab = tabs.find((t: any) => String(t.id) === String(params.tabId));
   if (!tab) return null;
+
+  let content = '';
+  if (tab.tabId) {
+    try {
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.tabId },
+        func: () => document.body.innerText.slice(0, 15000),
+      });
+      content = results[0]?.result || '';
+    } catch {}
+  }
+
   return {
     title: tab.title,
     url: tab.url,
@@ -228,6 +233,6 @@ async function handleGetTabExportData(params: Record<string, unknown>) {
     topic: tab.topic,
     tags: tab.tags,
     userScore: tab.userScore,
-    content: tab.aiSummary || tab.contentExcerpt || '',
+    content,
   };
 }

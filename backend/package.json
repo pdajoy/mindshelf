@@ -1,27 +1,52 @@
 {
-  "name": "mindshelf-backend",
-  "version": "2.2.0",
-  "private": true,
+  "name": "mindshelf",
+  "version": "2.3.0",
+  "description": "MindShelf — AI-powered Chrome tab manager with MCP support",
   "type": "module",
+  "bin": {
+    "mindshelf": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch src/cli.ts serve",
+    "dev:stdio": "tsx src/cli.ts",
     "build": "tsc",
-    "start": "tsx src/index.ts",
-    "start:prod": "node dist/index.js",
-    "mcp:stdio": "tsx src/mcp/stdio.ts"
+    "start": "node dist/cli.js serve",
+    "start:stdio": "node dist/cli.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "chrome",
+    "tabs",
+    "ai",
+    "mindshelf",
+    "model-context-protocol",
+    "browser",
+    "tab-manager"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pda-labs/mindshelf.git",
+    "directory": "backend"
+  },
+  "homepage": "https://github.com/pda-labs/mindshelf",
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "cors": "^2.8.6",
     "dotenv": "^17.3.1",
-    "express": "^5.2.1",
     "marked": "^17.0.4",
     "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.6",
     "@types/ws": "^8.18.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

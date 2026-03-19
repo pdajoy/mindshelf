@@ -8,8 +8,6 @@ export interface TabRecord {
 
   topic: string | null;
   tags: string[];
-  ai_summary: string | null;
-  ai_detailed_summary: string | null;
 
   user_score: number | null;
   status: string;

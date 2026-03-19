@@ -91,17 +91,14 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
 
   const buildFromCache = () => {
     const lines: string[] = [];
-    if (tab.ai_summary) lines.push(`## ${t('note.summary')}\n`, tab.ai_summary, '');
-    if (tab.content_text) lines.push('---\n', `## ${t('note.content')}\n`, tab.content_text.substring(0, 20000));
+    if (tab.content_text) lines.push(`## ${t('note.content')}\n`, tab.content_text.substring(0, 20000));
     if (!lines.length) lines.push(t('note.noContent'));
     setMarkdown(lines.join('\n'));
   };
 
   const buildMarkdown = (pc: PageContent) => {
     const lines: string[] = [];
-    if (tab.ai_summary) lines.push(`## ${t('note.summary')}\n`, tab.ai_summary, '');
     if (pc.markdown) {
-      if (lines.length) lines.push('---\n');
       lines.push(`## ${t('note.content')}\n`, pc.markdown.substring(0, 30000));
     }
     if (!lines.length) lines.push(pc.plainText || t('note.noContent'));

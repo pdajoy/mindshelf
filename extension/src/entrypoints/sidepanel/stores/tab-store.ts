@@ -50,7 +50,6 @@ function applyFilters(
       (t) =>
         t.title.toLowerCase().includes(q) ||
         t.domain.toLowerCase().includes(q) ||
-        (t.ai_summary && t.ai_summary.toLowerCase().includes(q)) ||
         t.tags.some((tag) => tag.toLowerCase().includes(q)),
     );
   }
@@ -109,8 +108,6 @@ function buildLocalTabRecords(
       favicon_url: t.favIconUrl || '',
       topic: cached?.topic ?? null,
       tags: cached?.tags ?? [],
-      ai_summary: cached?.ai_summary ?? null,
-      ai_detailed_summary: null,
       user_score: cached?.user_score ?? null,
       status: 'active',
       content_text: null,
@@ -128,6 +125,20 @@ function buildLocalTabRecords(
   }
 
   return Array.from(seen.values());
+}
+
+function syncTabsToStorage(tabs: TabRecord[]): void {
+  const lightweight = tabs.map(t => ({
+    id: t.id,
+    tabId: t.source_tab_id,
+    title: t.title,
+    url: t.url,
+    domain: t.domain,
+    topic: t.topic,
+    tags: t.tags,
+    userScore: t.user_score,
+  }));
+  chrome.storage.local.set({ tabs: lightweight }).catch(() => {});
 }
 
 export const useTabStore = create<TabState>((set, get) => ({
@@ -149,6 +160,7 @@ export const useTabStore = create<TabState>((set, get) => ({
       const enrichments = await getAllEnrichments();
       const tabs = buildLocalTabRecords(chromeTabs, enrichments);
       set({ tabs, isScanning: false });
+      syncTabsToStorage(tabs);
     } catch (e) {
       set({ error: (e as Error).message, isScanning: false });
     }
@@ -189,26 +201,24 @@ export const useTabStore = create<TabState>((set, get) => ({
     set({
       tabs: get().tabs.map((t) => (t.id === id ? { ...t, ...updates } : t)),
     });
-    // Persist enrichments for updated tabs
     const tab = get().tabs.find(t => t.id === id);
-    if (tab && (updates.topic !== undefined || updates.ai_summary !== undefined || updates.user_score !== undefined || updates.tags !== undefined)) {
+    if (tab && (updates.topic !== undefined || updates.user_score !== undefined || updates.tags !== undefined)) {
       batchSaveEnrichments([{
         url: tab.url,
         topic: tab.topic,
         tags: tab.tags,
-        ai_summary: tab.ai_summary,
         user_score: tab.user_score,
       }]).catch(() => {});
     }
+    syncTabsToStorage(get().tabs);
   },
 
   removeTab: (id) => {
     const next = new Set(get().selectedIds);
     next.delete(id);
-    set({
-      tabs: get().tabs.filter((t) => t.id !== id),
-      selectedIds: next,
-    });
+    const tabs = get().tabs.filter((t) => t.id !== id);
+    set({ tabs, selectedIds: next });
+    syncTabsToStorage(tabs);
   },
 
   setDuplicateGroups: (groups) => set({ duplicateGroups: groups }),

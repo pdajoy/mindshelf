@@ -52,7 +52,7 @@ export function BatchBar() {
           topic: tab.topic || undefined,
           tags: tab.tags,
           userScore: tab.user_score || undefined,
-              content: tab.ai_summary || tab.content_text?.substring(0, 30000) || t('batch.noContent'),
+              content: tab.content_text?.substring(0, 30000) || t('batch.noContent'),
           target: batchTarget,
           folder: batchFolder,
         });

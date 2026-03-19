@@ -14,4 +14,4 @@ RUN npm ci --omit=dev && npm cache clean --force && rm -rf /root/.npm /tmp/*
 COPY --from=builder /app/dist ./dist
 EXPOSE 3456
 USER node
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/cli.js", "serve"]

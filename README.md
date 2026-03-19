@@ -47,18 +47,16 @@ MindShelf's AI runs entirely in the browser. You only need the backend if you wa
 ### Option B: With backend (for export & MCP)
 
 ```bash
-# Backend
-cd backend
-cp .env.example .env    # configure Obsidian vault path if needed
-npm install && npm run dev
+# Start the MindShelf server (one command)
+npx mindshelf serve
+
+# Or with Obsidian vault:
+npx mindshelf serve --obsidian-vault /path/to/your/vault
 
 # Extension
 cd extension
 npm install && npm run build
 # Load extension/dist/chrome-mv3/ in chrome://extensions/
-
-# Development (HMR)
-cd extension && npm run dev
 ```
 
 Or use Docker for the backend:
@@ -68,6 +66,13 @@ docker run -d -p 3456:3456 \
   -v /path/to/obsidian/vault:/vault \
   -e OBSIDIAN_VAULT_PATH=/vault \
   ghcr.io/pda-labs/mindshelf/backend:main
+```
+
+For development:
+
+```bash
+cd backend && npm install && npm run dev   # auto-restart on changes
+cd extension && npm run dev                # HMR
 ```
 
 ### Use it
@@ -92,10 +97,11 @@ Chrome Extension (WXT + React 19 + TailwindCSS v4 + Zustand)
                 │ HTTP (export only)
                 │ WebSocket (MCP bridge)
                 ▼
-Backend (Express + TypeScript, lightweight)
+Backend — npx mindshelf (single process, no Express)
+    ├── HTTP Server — native Node.js http (export API)
+    ├── WebSocket Bridge — relays MCP commands to extension
     ├── Export — Apple Notes (osascript/JXA) · Obsidian (direct file write)
-    ├── MCP Server — 10 tools via @modelcontextprotocol/sdk
-    └── WebSocket Bridge — relays MCP commands to extension
+    └── MCP Server — 9 tools via @modelcontextprotocol/sdk (stdio transport)
 ```
 
 **Key design decision**: AI runs in the extension, not the backend. This means:
@@ -115,7 +121,13 @@ Click the gear icon → **AI Providers**:
 
 ### Backend (optional)
 
-Create `backend/.env` from `.env.example`:
+```bash
+npx mindshelf serve                              # default port 3456
+npx mindshelf serve --port 4000                  # custom port
+npx mindshelf serve --obsidian-vault ~/MyVault   # with Obsidian
+```
+
+Or create `backend/.env` from `.env.example`:
 
 ```env
 PORT=3456
@@ -126,7 +138,7 @@ PORT=3456
 
 ### MCP Integration
 
-MindShelf exposes 10 tools via MCP for external AI agents.
+MindShelf exposes 9 tools via MCP for external AI agents.
 
 **Cursor / Claude Desktop** (stdio):
 ```json
@@ -134,13 +146,15 @@ MindShelf exposes 10 tools via MCP for external AI agents.
   "mcpServers": {
     "mindshelf": {
       "command": "npx",
-      "args": ["tsx", "/path/to/backend/src/mcp/stdio.ts"]
+      "args": ["mindshelf"]
     }
   }
 }
 ```
 
-Requirements: Backend must be running, and the Chrome extension side panel must be open (to establish the WebSocket bridge).
+The stdio process auto-detects whether the MindShelf server is running and starts it in the background if needed. Multiple AI clients can connect simultaneously — each spawns a lightweight stdio process that shares the single server instance.
+
+Requirements: Chrome extension side panel must be open (to establish the WebSocket bridge).
 
 | MCP Tool | Description |
 |----------|-------------|
@@ -151,7 +165,6 @@ Requirements: Backend must be running, and the Chrome extension side panel must 
 | `categorize_tabs` | Trigger AI classification |
 | `detect_duplicates` | Find duplicate tabs |
 | `get_page_content` | Extract active page content |
-| `summarize_tab` | Get/generate AI summary |
 | `export_to_notes` | Export tab to Apple Notes |
 | `export_to_obsidian` | Export tab to Obsidian |
 

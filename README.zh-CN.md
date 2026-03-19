@@ -47,18 +47,16 @@ MindShelf 的 AI 完全在浏览器内运行。只有需要导出到 Apple Notes
 ### 方式 B：带后端（用于导出和 MCP）
 
 ```bash
-# 后端
-cd backend
-cp .env.example .env    # 按需配置 Obsidian vault 路径
-npm install && npm run dev
+# 启动 MindShelf 服务（一条命令）
+npx mindshelf serve
+
+# 或指定 Obsidian vault：
+npx mindshelf serve --obsidian-vault /path/to/your/vault
 
 # 扩展
 cd extension
 npm install && npm run build
 # 在 chrome://extensions/ 加载 extension/dist/chrome-mv3/
-
-# 开发模式（HMR）
-cd extension && npm run dev
 ```
 
 或用 Docker 启动后端：
@@ -68,6 +66,13 @@ docker run -d -p 3456:3456 \
   -v /path/to/obsidian/vault:/vault \
   -e OBSIDIAN_VAULT_PATH=/vault \
   ghcr.io/pda-labs/mindshelf/backend:main
+```
+
+开发模式：
+
+```bash
+cd backend && npm install && npm run dev   # 文件变更自动重启
+cd extension && npm run dev                # HMR
 ```
 
 ### 使用
@@ -92,10 +97,11 @@ Chrome 扩展 (WXT + React 19 + TailwindCSS v4 + Zustand)
                 │ HTTP（仅导出）
                 │ WebSocket（MCP 桥接）
                 ▼
-后端 (Express + TypeScript，轻量级)
+后端 — npx mindshelf（单进程，无 Express）
+    ├── HTTP 服务 — 原生 Node.js http（导出 API）
+    ├── WebSocket 桥接 — 转发 MCP 命令到扩展
     ├── 导出 — Apple Notes (osascript/JXA) · Obsidian（文件直写）
-    ├── MCP 服务 — 10 个工具，基于 @modelcontextprotocol/sdk
-    └── WebSocket 桥接 — 转发 MCP 命令到扩展
+    └── MCP 服务 — 9 个工具，基于 @modelcontextprotocol/sdk（stdio transport）
 ```
 
 **核心设计决策**：AI 运行在扩展端，不在后端。这意味着：
@@ -115,7 +121,13 @@ Chrome 扩展 (WXT + React 19 + TailwindCSS v4 + Zustand)
 
 ### 后端（可选）
 
-从 `.env.example` 创建 `backend/.env`：
+```bash
+npx mindshelf serve                              # 默认端口 3456
+npx mindshelf serve --port 4000                  # 自定义端口
+npx mindshelf serve --obsidian-vault ~/MyVault   # 指定 Obsidian vault
+```
+
+或从 `.env.example` 创建 `backend/.env`：
 
 ```env
 PORT=3456
@@ -126,7 +138,7 @@ PORT=3456
 
 ### MCP 集成
 
-MindShelf 通过 MCP 暴露 10 个工具供外部 AI 代理使用。
+MindShelf 通过 MCP 暴露 9 个工具供外部 AI 代理使用。
 
 **Cursor / Claude Desktop**（stdio 模式）：
 ```json
@@ -134,13 +146,15 @@ MindShelf 通过 MCP 暴露 10 个工具供外部 AI 代理使用。
   "mcpServers": {
     "mindshelf": {
       "command": "npx",
-      "args": ["tsx", "/path/to/backend/src/mcp/stdio.ts"]
+      "args": ["mindshelf"]
     }
   }
 }
 ```
 
-前提条件：后端必须运行，且 Chrome 扩展侧边栏已打开（以建立 WebSocket 桥接）。
+stdio 进程会自动检测 MindShelf 服务是否运行，如未运行会在后台自动启动。多个 AI 客户端可同时连接——每个客户端生成一个轻量 stdio 进程，共享同一个服务实例。
+
+前提条件：Chrome 扩展侧边栏已打开（以建立 WebSocket 桥接）。
 
 | MCP 工具 | 说明 |
 |----------|------|
@@ -151,7 +165,6 @@ MindShelf 通过 MCP 暴露 10 个工具供外部 AI 代理使用。
 | `categorize_tabs` | 触发 AI 分类 |
 | `detect_duplicates` | 检测重复标签 |
 | `get_page_content` | 提取当前页面内容 |
-| `summarize_tab` | 获取/生成 AI 摘要 |
 | `export_to_notes` | 导出到 Apple Notes |
 | `export_to_obsidian` | 导出到 Obsidian |
 

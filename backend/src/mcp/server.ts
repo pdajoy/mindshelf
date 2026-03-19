@@ -15,12 +15,12 @@ export function createMcpServer(options?: { invoke?: BridgeInvoker }): McpServer
   }
   const server = new McpServer({
     name: 'mindshelf',
-    version: '2.1.0',
+    version: '2.3.0',
   });
 
   server.tool(
     'list_tabs',
-    'List all browser tabs with title, URL, domain, topic, and AI summary',
+    'List all browser tabs with title, URL, domain, and topic',
     {},
     async () => {
       requireBridge();
@@ -32,7 +32,7 @@ export function createMcpServer(options?: { invoke?: BridgeInvoker }): McpServer
   server.tool(
     'search_tabs',
     'Search browser tabs by keywords (space/comma separated), domain, or topic',
-    { query: z.string().optional().describe('Keywords to match against title, domain, summary, tags'), domain: z.string().optional(), topic: z.string().optional() },
+    { query: z.string().optional().describe('Keywords to match against title, domain, tags'), domain: z.string().optional(), topic: z.string().optional() },
     async (args) => {
       requireBridge();
       const result = await invoke('search_tabs', args);
@@ -91,17 +91,6 @@ export function createMcpServer(options?: { invoke?: BridgeInvoker }): McpServer
     async () => {
       requireBridge();
       const result = await invoke('get_page_content');
-      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-    },
-  );
-
-  server.tool(
-    'summarize_tab',
-    'Generate an AI summary for a specific tab. Runs in the browser extension.',
-    { tabId: z.string().describe('Tab record ID to summarize') },
-    async (args) => {
-      requireBridge();
-      const result = await invoke('summarize_tab', args);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     },
   );

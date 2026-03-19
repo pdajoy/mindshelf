@@ -68,7 +68,7 @@ export const useAIStore = create<AIState>((set) => ({
         },
       });
 
-      const enrichToSave: Array<{ url: string; topic: string | null; tags: string[]; ai_summary: string | null; user_score: number | null }> = [];
+      const enrichToSave: Array<{ url: string; topic: string | null; tags: string[]; user_score: number | null }> = [];
 
       for (const [tabId, data] of Object.entries(classifications)) {
         const tab = allTabs.find(t => t.id === tabId);
@@ -82,7 +82,6 @@ export const useAIStore = create<AIState>((set) => ({
             url: tab.url,
             topic: data.category,
             tags: data.tags || [],
-            ai_summary: tab.ai_summary,
             user_score: tab.user_score,
           });
         }
