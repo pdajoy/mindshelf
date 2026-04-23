@@ -1,4 +1,4 @@
-## v2.3.1 — Language Sync, Selection Actions & Setup Docs
+## v2.3.2 — Language Sync, Selection Actions & Docs Polish
 
 ### Language & Settings
 
@@ -25,3 +25,4 @@
 - Added macOS permission guidance for MCP bridge access and Apple Notes export
 - Documented the new language and selection toolbar settings
 - Corrected GitHub Releases and GHCR image references to the current `pdajoy/mindshelf` repository
+- Added `STORE_COPY.md` with ready-to-use Chrome Web Store and release copy in English and Chinese
