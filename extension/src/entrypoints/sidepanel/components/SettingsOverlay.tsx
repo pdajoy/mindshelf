@@ -7,7 +7,7 @@ import type { AIProvider } from '@/lib/ai-client';
 import { X, Cpu, Server, FileText, FolderOpen, Wand2, Zap, Plus, Trash2, Pencil, Check, Key, Globe, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Languages } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n';
-import { changeLanguage } from '@/lib/i18n';
+import type { AppLanguage } from '@/lib/language';
 
 const PROVIDER_TYPES: { value: AIProvider; labelKey: string; placeholder: string; defaultModels: string[] }[] = [
   { value: 'openai', labelKey: 'settings.provider.openaiCompat', placeholder: 'sk-...', defaultModels: ['gpt-4o-mini', 'gpt-4o', 'gpt-4.1-mini'] },
@@ -156,9 +156,8 @@ export function SettingsOverlay() {
     s.setQuickPrompts(updated); setEditingIdx(null);
   };
 
-  const handleLanguageChange = (lang: 'auto' | 'zh' | 'en') => {
+  const handleLanguageChange = (lang: AppLanguage) => {
     s.setLanguage(lang);
-    changeLanguage(lang);
   };
 
   return createPortal(
@@ -175,11 +174,29 @@ export function SettingsOverlay() {
           <Section icon={<Languages className="h-3.5 w-3.5" />} label={t('settings.language')}>
             <div className="flex gap-1.5">
               {([['auto', t('settings.langAuto')], ['zh', t('settings.langZh')], ['en', t('settings.langEn')]] as const).map(([val, label]) => (
-                <button key={val} onClick={() => handleLanguageChange(val as 'auto' | 'zh' | 'en')} className={cn('flex-1 h-7 text-[11px] rounded-lg border transition-colors', s.language === val ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted')}>
+                <button key={val} onClick={() => handleLanguageChange(val)} className={cn('flex-1 h-7 text-[11px] rounded-lg border transition-colors', s.language === val ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted')}>
                   {label}
                 </button>
               ))}
             </div>
+          </Section>
+
+          <Section icon={<Globe className="h-3.5 w-3.5" />} label={t('settings.selectionToolbar')}>
+            <div className="flex gap-1.5">
+              {([[true, t('settings.selectionToolbarOn')], [false, t('settings.selectionToolbarOff')]] as const).map(([enabled, label]) => (
+                <button
+                  key={String(enabled)}
+                  onClick={() => s.setSelectionToolbarEnabled(enabled)}
+                  className={cn(
+                    'flex-1 h-7 text-[11px] rounded-lg border transition-colors',
+                    s.selectionToolbarEnabled === enabled ? 'border-primary bg-primary/10 text-primary font-medium' : 'border-border hover:bg-muted',
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-[10px] text-muted-foreground">{t('settings.selectionToolbarDesc')}</p>
           </Section>
 
           {/* AI Providers */}

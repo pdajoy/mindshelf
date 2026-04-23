@@ -1,42 +1,27 @@
-## v2.3.0 — npm Publishable Backend & Architecture Cleanup
+## v2.3.1 — Language Sync, Selection Actions & Setup Docs
 
-### npm Package
+### Language & Settings
 
-MindShelf backend is now published as an npm package. Start it with a single command:
+- Fixed **Auto-detect** language mode so it re-resolves the browser UI language instead of sticking to the previous choice
+- Popup now follows the extension language setting instead of staying hardcoded
+- Added a Settings toggle for the text selection toolbar
 
-```bash
-npx mindshelf serve              # HTTP + WebSocket server
-npx mindshelf                    # stdio MCP mode (for Cursor / Claude Desktop)
-npx mindshelf serve --obsidian-vault ~/MyVault
-```
+### Selection Toolbar & Side Panel
 
-### Architecture Refactoring
+- Added inline **Ask AI / Save** actions for highlighted text on web pages
+- Improved side panel opening for selection actions by preserving the click gesture path more reliably
+- Selection toolbar labels and follow-up prompts now use the active extension locale
 
-- **Replaced Express.js with native Node.js HTTP** — removed 4 dependencies (`express`, `cors`, `@types/express`, `@types/cors`), faster startup, smaller package (10.4 KB)
-- **Unified CLI entry point** (`backend/src/cli.ts`) — single binary for both `serve` and `stdio` modes
-- **stdio mode auto-starts server** — `npx mindshelf` detects if the backend is running and spawns it in the background if needed
-- **Multi-client support** — multiple AI clients (Cursor, Claude Desktop) share one server instance via lightweight stdio proxies, no port conflicts
+### Content Extraction & Chat UX
 
-### WebSocket Bridge Stability
+- Switched more chat/note/agent flows to HTML-first extraction, then clean parsing via Defuddle for more consistent page text
+- Selection-based save now keeps the selected content when opening the note dialog
+- Added the current date to the AI system prompt
+- Chat input remains editable while the model is streaming
 
-- Fixed connection loop: backend now rejects duplicate WebSocket connections from the extension's service worker
-- Tab data synced to `chrome.storage.local` for reliable bridge access even when side panel state differs
+### Documentation & Distribution
 
-### Content Extraction
-
-- `get_page_content` and export tools now auto-extract page content via `chrome.scripting.executeScript`
-
-### Code Cleanup
-
-- Removed `ai_summary` and `ai_detailed_summary` fields from `TabRecord` and all references across 10+ files
-- Removed empty `summarize_tab` MCP tool — now 9 MCP tools total
-- Removed unused `bookmarks` and `notifications` Chrome permissions
-- Version numbers centralized — read from `package.json` at runtime instead of hardcoded strings
-
-### Extension Permissions Reduced
-
-Removed `bookmarks` and `notifications` permissions that were declared but never used, reducing the permission surface for Chrome Web Store review.
-
-### Docker
-
-Updated Dockerfiles to use the new CLI entry point: `node dist/cli.js serve`
+- Added the Chrome Web Store install link to both README versions
+- Added macOS permission guidance for MCP bridge access and Apple Notes export
+- Documented the new language and selection toolbar settings
+- Corrected GitHub Releases and GHCR image references to the current `pdajoy/mindshelf` repository

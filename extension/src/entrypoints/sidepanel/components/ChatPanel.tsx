@@ -173,17 +173,19 @@ export function ChatPanel() {
 
     let contentText = tab.content_text || '';
     if (!contentText && tab.source_tab_id) {
+      const extractClean = async (html: string) => {
+        const { extractFromHTML } = await import('@/lib/content-extractor');
+        const extracted = extractFromHTML(html, tab.url, 'defuddle');
+        return extracted.plainText || extracted.markdown || '';
+      };
       try {
-        const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId: tab.source_tab_id });
-        if (htmlResult?.html) {
-          const { extractFromHTML } = await import('@/lib/content-extractor');
-          const extracted = extractFromHTML(htmlResult.html, tab.url, 'readability');
-          contentText = extracted.plainText || extracted.markdown || '';
-        }
-      } catch {
+        const csResult = await chrome.tabs.sendMessage(tab.source_tab_id, { type: 'EXTRACT_CONTENT_CS' });
+        if (csResult?.html) contentText = await extractClean(csResult.html);
+      } catch {}
+      if (!contentText) {
         try {
-          const result = await chrome.runtime.sendMessage({ type: 'EXTRACT_CONTENT', tabId: tab.source_tab_id });
-          if (result?.content_text) contentText = result.content_text;
+          const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId: tab.source_tab_id });
+          if (htmlResult?.html) contentText = await extractClean(htmlResult.html);
         } catch {}
       }
     }
@@ -242,11 +244,21 @@ export function ChatPanel() {
       return cur?.url === ctx.url;
     };
 
+    const applyExtracted = async (html: string) => {
+      const { extractFromHTML } = await import('@/lib/content-extractor');
+      const extracted = extractFromHTML(html, url, 'defuddle');
+      const text = extracted.plainText || extracted.markdown || '';
+      if (text && guard()) {
+        setPageContext({ ...ctx, contentExcerpt: text.substring(0, 3000) });
+        return true;
+      }
+      return false;
+    };
+
     try {
       const result = await chrome.tabs.sendMessage(tabId, { type: 'EXTRACT_CONTENT_CS' });
-      if (result?.content_text && guard()) {
-        setPageContext({ ...ctx, contentExcerpt: result.content_text.substring(0, 3000) });
-        return;
+      if (result?.html && guard()) {
+        if (await applyExtracted(result.html)) return;
       }
     } catch { /* content script not ready */ }
 
@@ -255,12 +267,7 @@ export function ChatPanel() {
     try {
       const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId });
       if (htmlResult?.html && guard()) {
-        const { extractFromHTML } = await import('@/lib/content-extractor');
-        const extracted = extractFromHTML(htmlResult.html, url, 'readability');
-        const text = extracted.plainText || '';
-        if (text) {
-          setPageContext({ ...ctx, contentExcerpt: text.substring(0, 3000) });
-        }
+        await applyExtracted(htmlResult.html);
       }
     } catch { /* extraction failed, metadata-only fallback */ }
   };
@@ -542,9 +549,9 @@ export function ChatPanel() {
             ref={inputRef}
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !isStreaming) { e.preventDefault(); handleSend(); } }}
             placeholder={aiConfigured ? t('chat.inputPlaceholder') : t('chat.configPlaceholder')}
-            disabled={isStreaming || !aiConfigured}
+            disabled={!aiConfigured}
             rows={input.split('\n').length > 3 ? 4 : input.includes('\n') ? 2 : 1}
             className="flex-1 min-h-[32px] max-h-24 px-3 py-1.5 text-xs rounded-lg border border-border bg-background focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50 resize-none"
           />

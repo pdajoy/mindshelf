@@ -2,18 +2,15 @@ import i18next from 'i18next';
 import { initReactI18next, useTranslation } from 'react-i18next';
 import zh from '../locales/zh.json';
 import en from '../locales/en.json';
+import {
+  getStoredLocalLanguagePreference,
+  persistLocalLanguagePreference,
+  resolveLanguage,
+  type AppLanguage,
+} from './language';
 
 function detectLanguage(): string {
-  try {
-    const stored = localStorage.getItem('mindshelf_language');
-    if (stored && stored !== 'auto') return stored;
-  } catch {}
-  try {
-    const lang = chrome?.i18n?.getUILanguage?.() || navigator.language || 'en';
-    return lang.startsWith('zh') ? 'zh' : 'en';
-  } catch {
-    return 'en';
-  }
+  return resolveLanguage(getStoredLocalLanguagePreference());
 }
 
 i18next.use(initReactI18next).init({
@@ -23,14 +20,9 @@ i18next.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 });
 
-export function changeLanguage(lang: 'auto' | 'zh' | 'en') {
-  if (lang === 'auto') {
-    const detected = detectLanguage();
-    i18next.changeLanguage(detected);
-  } else {
-    i18next.changeLanguage(lang);
-  }
-  try { localStorage.setItem('mindshelf_language', lang); } catch {}
+export function changeLanguage(lang: AppLanguage) {
+  persistLocalLanguagePreference(lang);
+  i18next.changeLanguage(resolveLanguage(lang));
 }
 
 export const useT = useTranslation;

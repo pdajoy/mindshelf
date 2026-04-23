@@ -62,7 +62,12 @@ export function NoteDialog({ tab, onClose }: NoteDialogProps) {
   }, [target, backendAvailable]);
 
   useEffect(() => {
-    if (!tab.source_tab_id) return;
+    if (!tab.source_tab_id) {
+      if (tab.content_text) {
+        setMarkdown(tab.content_text);
+      }
+      return;
+    }
     setExtracting(true);
     chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId: tab.source_tab_id })
       .then((res: any) => {

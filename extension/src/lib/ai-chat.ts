@@ -85,11 +85,17 @@ export interface PageContext {
   contentExcerpt?: string;
 }
 
+function todayString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function buildSystemPrompt(
   base: string,
   pageContext?: PageContext | null,
 ): string {
   let prompt = base;
+  prompt += `\n\nCurrent date: ${todayString()}`;
   if (pageContext) {
     prompt += `\n\n## Current Page Context\nUser is browsing:\n- Title: ${pageContext.title}\n- URL: ${pageContext.url}\n- Domain: ${pageContext.domain}`;
     if (pageContext.contentExcerpt) {

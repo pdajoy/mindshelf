@@ -114,6 +114,20 @@
     "veryValuable": "很有价值",
     "mustSave": "必须保存"
   },
+  "selection": {
+    "askPrompt": "以下是我从「{{title}}」中选中的内容：\n\n> {{text}}\n\n请帮我分析解读这段内容。",
+    "askAI": "问 AI",
+    "save": "保存"
+  },
+  "popup": {
+    "tabs": "标签",
+    "domains": "域名",
+    "generating": "生成中...",
+    "continueAsking": "继续追问",
+    "aiChat": "AI 对话",
+    "openSidePanel": "打开侧边栏",
+    "errorPrefix": "错误："
+  },
   "chat": {
     "chatHistory": "对话历史",
     "newChat": "新对话",
@@ -188,6 +202,10 @@
     "langAuto": "自动检测",
     "langZh": "中文",
     "langEn": "English",
+    "selectionToolbar": "划词工具栏",
+    "selectionToolbarDesc": "在网页中选中文本时显示“问 AI”和“保存”操作",
+    "selectionToolbarOn": "开启",
+    "selectionToolbarOff": "关闭",
     "footer": "MindShelf · AI 在前端直接调用",
     "footerBackend": " · 后端提供导出",
     "provider": {

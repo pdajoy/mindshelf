@@ -169,20 +169,27 @@ export const agentTools = {
           return { content: '', display: t('tool.cannotGetContent') };
         }
 
+        const extractClean = async (html: string) => {
+          const { extractFromHTML } = await import('@/lib/content-extractor');
+          const extracted = extractFromHTML(html, tab.url || '', 'defuddle');
+          return extracted.plainText || extracted.markdown || '';
+        };
+
         try {
           const result = await chrome.tabs.sendMessage(tab.id, { type: 'EXTRACT_CONTENT_CS' });
-          if (result?.content_text) {
-            const content = result.content_text.substring(0, 8000);
-            return { title: tab.title, url: tab.url, content, display: t('tool.gotContent', { count: content.length }) };
+          if (result?.html) {
+            const text = await extractClean(result.html);
+            if (text) {
+              const content = text.substring(0, 8000);
+              return { title: tab.title, url: tab.url, content, display: t('tool.gotContent', { count: content.length }) };
+            }
           }
         } catch {}
 
         try {
           const htmlResult = await chrome.runtime.sendMessage({ type: 'EXTRACT_HTML', tabId: tab.id });
           if (htmlResult?.html) {
-            const { extractFromHTML } = await import('@/lib/content-extractor');
-            const extracted = extractFromHTML(htmlResult.html, tab.url || '', 'readability');
-            const text = extracted.plainText || extracted.markdown || '';
+            const text = await extractClean(htmlResult.html);
             if (text) {
               const content = text.substring(0, 8000);
               return { title: tab.title, url: tab.url, content, display: t('tool.gotContent', { count: content.length }) };

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { AIProvider } from '@/lib/ai-client';
+import { SETTINGS_STORAGE_KEY, type AppLanguage } from '@/lib/language';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type NoteStyle = 'concise' | 'detailed' | 'deep' | 'custom';
@@ -24,7 +25,8 @@ interface SettingsState {
   activeProviderId: string;
   activeModel: string;
   maxAgentSteps: number;
-  language: 'auto' | 'zh' | 'en';
+  language: AppLanguage;
+  selectionToolbarEnabled: boolean;
 
   backendUrl: string;
   theme: ThemeMode;
@@ -41,7 +43,8 @@ interface SettingsState {
   setActiveProvider: (id: string, model?: string) => void;
   setActiveModel: (model: string) => void;
   setMaxAgentSteps: (n: number) => void;
-  setLanguage: (lang: 'auto' | 'zh' | 'en') => void;
+  setLanguage: (lang: AppLanguage) => void;
+  setSelectionToolbarEnabled: (enabled: boolean) => void;
   setBackendUrl: (url: string) => void;
   setTheme: (theme: ThemeMode) => void;
   setDefaultExportTarget: (t: 'apple_notes' | 'obsidian') => void;
@@ -63,12 +66,12 @@ const DEFAULT_QUICK_PROMPTS: QuickPrompt[] = [
   { name: '技术笔记', prompt: '整理为技术笔记格式，突出代码和实现细节' },
 ];
 
-const STORAGE_KEY = 'mindshelf_settings';
 const SYNC_KEYS = [
   'providers', 'activeProviderId', 'activeModel',
   'maxAgentSteps', 'language', 'backendUrl', 'theme',
   'defaultExportTarget', 'defaultFolder', 'noteStyle',
   'customStylePrompt', 'defaultExtractor', 'quickPrompts',
+  'selectionToolbarEnabled',
 ] as const;
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -77,6 +80,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   activeModel: '',
   maxAgentSteps: 5,
   language: 'auto',
+  selectionToolbarEnabled: true,
 
   backendUrl: 'http://127.0.0.1:3456',
   theme: 'system',
@@ -129,6 +133,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   setActiveModel: (model) => { set({ activeModel: model }); persist({ activeModel: model }); },
   setMaxAgentSteps: (v) => { set({ maxAgentSteps: v }); persist({ maxAgentSteps: v }); },
   setLanguage: (v) => { set({ language: v }); persist({ language: v }); },
+  setSelectionToolbarEnabled: (v) => { set({ selectionToolbarEnabled: v }); persist({ selectionToolbarEnabled: v }); },
   setBackendUrl: (v) => { set({ backendUrl: v }); persist({ backendUrl: v }); },
   setTheme: (v) => { set({ theme: v }); applyTheme(v); persist({ theme: v }); },
   setDefaultExportTarget: (v) => { set({ defaultExportTarget: v }); persist({ defaultExportTarget: v }); },
@@ -163,8 +168,8 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   loadFromStorage: async () => {
     try {
-      const r = await chrome.storage.local.get(STORAGE_KEY);
-      const s = r[STORAGE_KEY];
+      const r = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+      const s = r[SETTINGS_STORAGE_KEY];
       if (s) {
         // Migration: old single-provider format → multi-provider
         if (s.aiApiKey && (!s.providers || !s.providers.length)) {
@@ -208,15 +213,15 @@ if (typeof window !== 'undefined') {
 }
 
 function persist(partial: Record<string, unknown>) {
-  chrome.storage.local.get(STORAGE_KEY).then(r => {
-    chrome.storage.local.set({ [STORAGE_KEY]: { ...(r[STORAGE_KEY] || {}), ...partial } });
+  chrome.storage.local.get(SETTINGS_STORAGE_KEY).then(r => {
+    chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: { ...(r[SETTINGS_STORAGE_KEY] || {}), ...partial } });
   }).catch(() => {});
 }
 
 if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== 'local' || !changes[STORAGE_KEY]) return;
-    const nv = changes[STORAGE_KEY].newValue;
+    if (area !== 'local' || !changes[SETTINGS_STORAGE_KEY]) return;
+    const nv = changes[SETTINGS_STORAGE_KEY].newValue;
     if (!nv) return;
     const state = useSettingsStore.getState();
     const u: Record<string, unknown> = {};

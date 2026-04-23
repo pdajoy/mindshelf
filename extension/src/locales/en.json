@@ -114,6 +114,20 @@
     "veryValuable": "Very valuable",
     "mustSave": "Must save"
   },
+  "selection": {
+    "askPrompt": "Selected from \"{{title}}\":\n\n> {{text}}\n\nPlease analyze and explain this content.",
+    "askAI": "Ask AI",
+    "save": "Save"
+  },
+  "popup": {
+    "tabs": "Tabs",
+    "domains": "Domains",
+    "generating": "Generating...",
+    "continueAsking": "Continue asking",
+    "aiChat": "AI Chat",
+    "openSidePanel": "Open side panel",
+    "errorPrefix": "Error: "
+  },
   "chat": {
     "chatHistory": "Chat History",
     "newChat": "New Chat",
@@ -188,6 +202,10 @@
     "langAuto": "Auto-detect",
     "langZh": "中文",
     "langEn": "English",
+    "selectionToolbar": "Text Selection Toolbar",
+    "selectionToolbarDesc": "Show Ask AI and Save actions when selecting text on web pages",
+    "selectionToolbarOn": "On",
+    "selectionToolbarOff": "Off",
     "footer": "MindShelf · AI runs in browser",
     "footerBackend": " · Backend for export",
     "provider": {

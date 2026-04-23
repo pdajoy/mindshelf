@@ -16,12 +16,14 @@ import { MESSAGE_TYPES } from '@/lib/types';
 import type { SyncedTab, TabRecord } from '@/lib/types';
 import { checkBackendAvailable } from '@/lib/backend-status';
 import { setBackendUrl } from '@/lib/utils';
+import i18n, { changeLanguage } from '@/lib/i18n';
 
 export type TabViewMode = 'list' | 'grouped' | 'duplicates';
 
 const NOTE_TRIGGER_KEY = 'mindshelf_open_note_for_url';
 const PANEL_TRIGGER_KEY = 'mindshelf_open_panel';
 const CHAT_TRIGGER_KEY = 'mindshelf_continue_chat';
+const SELECTION_TRIGGER_KEY = 'mindshelf_selection';
 
 function Toast() {
   const toast = useNavStore(s => s.toast);
@@ -38,8 +40,13 @@ export function App() {
   const [noteTab, setNoteTab] = useState<TabRecord | null>(null);
   const { activePanel, showSettings, setActivePanel } = useNavStore();
   const { syncTabs, tabs } = useTabStore();
-  const { loadFromStorage } = useSettingsStore();
+  const loadFromStorage = useSettingsStore(s => s.loadFromStorage);
+  const language = useSettingsStore(s => s.language);
   const { createSession, sendMessage } = useChatStore();
+
+  useEffect(() => {
+    changeLanguage(language);
+  }, [language]);
 
   useEffect(() => {
     const init = async () => {
@@ -175,6 +182,72 @@ export function App() {
           createSession();
           setTimeout(() => sendMessage(`继续分析：\n${title}\n${url}\n\n之前摘要：${summary}`), 200);
         } catch {}
+      }
+    };
+    chrome.storage.onChanged.addListener(listener);
+    return () => chrome.storage.onChanged.removeListener(listener);
+  }, []);
+
+  // Handle text selection actions from content script
+  useEffect(() => {
+    const handleSelection = async (raw: string) => {
+      try {
+        const sel = JSON.parse(raw) as { action: string; text: string; title: string; url: string; timestamp: number };
+        if (Date.now() - sel.timestamp > 10000) return;
+        const domain = (() => { try { return new URL(sel.url).hostname.replace('www.', ''); } catch { return ''; } })();
+
+        if (sel.action === 'ask') {
+          setActivePanel('chat');
+          createSession();
+          useChatStore.setState({
+            pageContext: { title: sel.title, url: sel.url, domain, contentExcerpt: sel.text },
+          });
+          setTimeout(() => {
+            const prompt = i18n.t('selection.askPrompt', { title: sel.title, text: sel.text });
+            sendMessage(prompt);
+          }, 200);
+        } else if (sel.action === 'save') {
+          const syntheticTab: TabRecord = {
+            id: `sel-${Date.now()}`,
+            url: sel.url,
+            canonical_url: sel.url,
+            title: sel.title,
+            domain,
+            favicon_url: '',
+            topic: null,
+            tags: [],
+            user_score: null,
+            status: 'scanned',
+            content_text: sel.text,
+            language: null,
+            word_count: sel.text.split(/\s+/).filter(Boolean).length,
+            source_tab_id: null,
+            source_window_id: null,
+            scanned_at: new Date().toISOString(),
+            processed_at: null,
+            closed_at: null,
+            created_at: new Date().toISOString(),
+          };
+          setNoteTab(syntheticTab);
+        }
+      } catch {}
+    };
+
+    const checkSelection = async () => {
+      try {
+        const r = await chrome.storage.local.get(SELECTION_TRIGGER_KEY);
+        if (r[SELECTION_TRIGGER_KEY]) {
+          await chrome.storage.local.remove(SELECTION_TRIGGER_KEY);
+          handleSelection(r[SELECTION_TRIGGER_KEY]);
+        }
+      } catch {}
+    };
+    checkSelection();
+
+    const listener = (changes: Record<string, chrome.storage.StorageChange>, area: string) => {
+      if (area === 'local' && changes[SELECTION_TRIGGER_KEY]?.newValue) {
+        chrome.storage.local.remove(SELECTION_TRIGGER_KEY);
+        handleSelection(changes[SELECTION_TRIGGER_KEY].newValue);
       }
     };
     chrome.storage.onChanged.addListener(listener);

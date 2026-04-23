@@ -7,7 +7,7 @@ export default defineBackground(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: false });
   startBridgeClient();
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch (message.type) {
       case MESSAGE_TYPES.SCAN_TABS:
         handleScanTabs().then(sendResponse);
@@ -33,7 +33,10 @@ export default defineBackground(() => {
         handleExtractHTML(message.tabId).then(sendResponse);
         return true;
 
-      // GET_BOOKMARKS removed — maintaining tool focus
+      case 'SELECTION_ACTION':
+        handleSelectionAction(message, sender.tab?.id, sender.tab?.windowId);
+        sendResponse({ success: true });
+        return false;
     }
   });
 
@@ -137,6 +140,36 @@ async function handleExtractHTML(tabId: number) {
   } catch (err) {
     return { error: (err as Error).message };
   }
+}
+
+function handleSelectionAction(message: { action: string; text: string; title: string; url: string }, tabId?: number, windowId?: number) {
+  const payload = JSON.stringify({
+    action: message.action,
+    text: message.text,
+    title: message.title,
+    url: message.url,
+    timestamp: Date.now(),
+  });
+
+  // Persist after requesting the side panel so the click gesture is still considered active.
+  const persistSelection = () => {
+    chrome.storage.local.set({ mindshelf_selection: payload }).catch(() => {});
+  };
+
+  if (tabId || windowId) {
+    const options = tabId ? { tabId, ...(windowId ? { windowId } : {}) } : { windowId: windowId! };
+    chrome.sidePanel.open(options).then(persistSelection).catch(() => persistSelection());
+    return;
+  }
+
+  chrome.tabs.query({ active: true, currentWindow: true }).then(([tab]) => {
+    if (tab?.id || tab?.windowId) {
+      const options = tab.id ? { tabId: tab.id, ...(tab.windowId ? { windowId: tab.windowId } : {}) } : { windowId: tab.windowId! };
+      chrome.sidePanel.open(options).then(persistSelection).catch(() => persistSelection());
+      return;
+    }
+    persistSelection();
+  }).catch(() => persistSelection());
 }
 
 function broadcastToSidePanel(message: unknown) {

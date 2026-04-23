@@ -4,6 +4,8 @@
 
 [中文文档](./README.zh-CN.md)
 
+[Chrome Web Store](https://chromewebstore.google.com/detail/foboooljjmhcbobgchlfmgbaipnbdmja)
+
 ---
 
 You know the feeling. 300 browser tabs, each one "too important to close." You can't organize them because there are too many. You can't close them because you might lose something valuable. So they just... sit there, draining your memory and your mind.
@@ -27,6 +29,7 @@ Anxiety ("I have 300 tabs")
 - **Duplicate Detection** — 4-level matching (exact URL > canonical URL > exact title > similar title)
 - **Knowledge Export** — Save to **Apple Notes** (rich HTML), **Obsidian** (Markdown + YAML frontmatter), or download as `.md`
 - **Content Extraction** — Defuddle / Readability / plaintext, switchable per tab
+- **Selection Toolbar** — Ask AI or save highlighted text from any page, with a Settings toggle
 - **Virtual Scrolling** — Handles 2000+ tabs smoothly
 - **Multi-Provider AI** — OpenAI, Anthropic, and any OpenAI-compatible API (Ollama, vLLM, Azure, etc.)
 - **MCP Server** — External AI agents (Cursor, Claude Desktop) can manage your tabs via MCP
@@ -35,16 +38,21 @@ Anxiety ("I have 300 tabs")
 
 ## Quick Start
 
-### Option A: Extension only (recommended)
+### Option A: Install from Chrome Web Store (recommended)
 
 MindShelf's AI runs entirely in the browser. You only need the backend if you want to export to Apple Notes or Obsidian, or use MCP.
 
-1. Go to [Releases](https://github.com/pda-labs/mindshelf/releases) and download the latest Chrome extension zip
+1. Install from [Chrome Web Store](https://chromewebstore.google.com/detail/foboooljjmhcbobgchlfmgbaipnbdmja)
+2. Open the side panel → configure your AI provider in Settings (gear icon)
+3. Done. Start scanning and classifying.
+
+### Option B: Manual install (zip / local build)
+
+1. Download the latest extension zip from [GitHub Releases](https://github.com/pdajoy/mindshelf/releases)
 2. Unzip and load in `chrome://extensions/` (Developer mode → Load unpacked)
 3. Open the side panel → configure your AI provider in Settings (gear icon)
-4. Done. Start scanning and classifying.
 
-### Option B: With backend (for export & MCP)
+### Option C: With backend (for export & MCP)
 
 ```bash
 # Start the MindShelf server (one command)
@@ -65,7 +73,7 @@ Or use Docker for the backend:
 docker run -d -p 3456:3456 \
   -v /path/to/obsidian/vault:/vault \
   -e OBSIDIAN_VAULT_PATH=/vault \
-  ghcr.io/pda-labs/mindshelf/backend:main
+  ghcr.io/pdajoy/mindshelf/backend:latest
 ```
 
 For development:
@@ -119,6 +127,11 @@ Click the gear icon → **AI Providers**:
 - Set API key, base URL, and model list per provider
 - Activate one provider and select a default model
 
+### Interface & Productivity (in extension Settings)
+
+- Language — Auto-detect / Chinese / English
+- Selection Toolbar — show or hide the inline **Ask AI** / **Save** actions for highlighted text
+
 ### Backend (optional)
 
 ```bash
@@ -155,6 +168,12 @@ MindShelf exposes 9 tools via MCP for external AI agents.
 The stdio process auto-detects whether the MindShelf server is running and starts it in the background if needed. Multiple AI clients can connect simultaneously — each spawns a lightweight stdio process that shares the single server instance.
 
 Requirements: Chrome extension side panel must be open (to establish the WebSocket bridge).
+
+### macOS Permissions (for MCP & export)
+
+- **Chrome Local Network access** — MindShelf connects the extension to the local backend over `ws://localhost:3456`. On newer Chrome versions, allow the extension's **Local Network** permission when prompted. If you denied it earlier, reopen the extension's site details in Chrome and switch **Local Network** to **Allow**.
+- **Automation / Apple Events** — Apple Notes export uses `osascript` to control Notes.app. The first export may trigger a macOS prompt for the app that launched `npx mindshelf` (Terminal, iTerm, Cursor, Claude Desktop, etc.). Approve it in **System Settings → Privacy & Security → Automation**.
+- **Obsidian export** — No extra macOS prompt is expected beyond giving MindShelf a valid writable vault path.
 
 | MCP Tool | Description |
 |----------|-------------|
