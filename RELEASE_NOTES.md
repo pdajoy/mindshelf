@@ -1,19 +1,17 @@
-## v2.3.3 — Chrome Native i18n Packaging
+## v2.3.4 — Remove Docker Publishing Workflow
 
-### Chrome Web Store Localization
+### Release Workflow
 
-- Added Chrome-native `_locales` bundles for `en` and `zh_CN`
-- Added `default_locale` to the extension manifest
-- Localized manifest `name` and `description` with `__MSG_...__` placeholders so Chrome Web Store can detect multiple supported languages
+- Removed the GHCR Docker image publishing pipeline from GitHub Actions
+- Kept the tag-time backend TypeScript build so releases still validate the backend before publishing
+- Simplified GitHub Release generation to attach only the extension zip artifact
 
-### Build Output
+### Repository Cleanup
 
-- Verified the packaged extension now includes:
-  - `dist/chrome-mv3/_locales/en/messages.json`
-  - `dist/chrome-mv3/_locales/zh_CN/messages.json`
-- Verified the built manifest now contains `default_locale: "en"`
+- Removed Docker-specific setup instructions from both README versions
+- Removed unused backend Dockerfiles now that Docker is no longer a published distribution path
 
 ### Notes
 
-- This release is about Chrome extension packaging metadata, not the in-app `i18next` runtime language switcher
-- Chrome Web Store listing text still needs to be translated separately in the developer dashboard
+- The supported backend startup path remains `npx mindshelf serve`
+- This release changes CI/release distribution only; it does not change extension or backend runtime behavior

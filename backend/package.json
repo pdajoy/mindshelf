@@ -1,6 +1,6 @@
 {
   "name": "mindshelf",
-  "version": "2.3.3",
+  "version": "2.3.4",
   "description": "MindShelf — AI-powered Chrome tab manager with MCP support",
   "type": "module",
   "bin": {

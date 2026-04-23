@@ -67,15 +67,6 @@ npm install && npm run build
 # 在 chrome://extensions/ 加载 extension/dist/chrome-mv3/
 ```
 
-或用 Docker 启动后端：
-
-```bash
-docker run -d -p 3456:3456 \
-  -v /path/to/obsidian/vault:/vault \
-  -e OBSIDIAN_VAULT_PATH=/vault \
-  ghcr.io/pdajoy/mindshelf/backend:latest
-```
-
 开发模式：
 
 ```bash
@@ -202,11 +193,9 @@ stdio 进程会自动检测 MindShelf 服务是否运行，如未运行会在后
 
 ## CI/CD
 
-GitHub Actions 在每次推送到 `main` 时自动执行：
-- **Chrome 扩展** — 构建并打包为可下载的 zip 产物
-- **后端 Docker 镜像** — 多阶段构建（`tsc` → `node:22-alpine`），推送到 GHCR
+GitHub Actions 会在每次推送到 `main` 时自动构建并打包 Chrome 扩展。
 
-打 `v*` 标签会自动创建 GitHub Release 并附带扩展 zip。
+打 `v*` 标签时，会额外校验 backend 构建，并自动创建附带扩展 zip 的 GitHub Release。
 
 ## 协议
 

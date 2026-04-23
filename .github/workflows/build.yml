@@ -8,10 +8,6 @@ on:
     branches: [main]
   workflow_dispatch:
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/backend
-
 jobs:
   build-extension:
     name: Chrome Extension
@@ -51,7 +47,7 @@ jobs:
           path: extension/dist/*.zip
           if-no-files-found: error
 
-  build-backend-dist:
+  build-backend:
     name: Backend TypeScript Build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
@@ -74,131 +70,9 @@ jobs:
         working-directory: backend
         run: npm ci && npm run build
 
-      - name: Upload dist + package files
-        uses: actions/upload-artifact@v5
-        with:
-          name: backend-dist
-          path: |
-            backend/dist/
-            backend/package.json
-            backend/package-lock.json
-            backend/Dockerfile.ci
-
-  build-backend-image:
-    name: Docker (${{ matrix.platform }})
-    needs: build-backend-dist
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ${{ matrix.runner }}
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      matrix:
-        include:
-          - platform: linux/amd64
-            runner: ubuntu-latest
-            suffix: amd64
-          - platform: linux/arm64
-            runner: ubuntu-24.04-arm
-            suffix: arm64
-    steps:
-      - uses: actions/download-artifact@v5
-        with:
-          name: backend-dist
-          path: context/
-
-      - name: Prepare Docker context
-        run: |
-          cp context/Dockerfile.ci context/Dockerfile
-          ls -la context/dist/
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-
-      - name: Build and push (single platform)
-        id: build
-        uses: docker/build-push-action@v7
-        with:
-          context: context
-          platforms: ${{ matrix.platform }}
-          push: true
-          labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
-          cache-from: type=gha,scope=${{ matrix.suffix }}
-          cache-to: type=gha,scope=${{ matrix.suffix }},mode=max
-
-      - name: Export digest
-        run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v5
-        with:
-          name: digest-${{ matrix.suffix }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-
-  merge-manifests:
-    name: Merge Multi-Arch Manifest
-    needs: build-backend-image
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - name: Download digests
-        uses: actions/download-artifact@v5
-        with:
-          path: /tmp/digests
-          pattern: digest-*
-          merge-multiple: true
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest
-
-      - name: Create and push manifest
-        working-directory: /tmp/digests
-        run: |
-          docker buildx imagetools create \
-            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@sha256:%s ' *)
-
   release:
     name: Create Release
-    needs: [build-extension, merge-manifests]
+    needs: [build-extension, build-backend]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -218,13 +92,7 @@ jobs:
         id: notes
         run: |
           if [ -f RELEASE_NOTES.md ]; then
-            {
-              cat RELEASE_NOTES.md
-              echo ""
-              echo "---"
-              echo ""
-              echo "**Docker:** \`docker pull ghcr.io/${{ github.repository }}/backend:${GITHUB_REF_NAME#v}\`"
-            } > /tmp/body.md
+            cat RELEASE_NOTES.md > /tmp/body.md
           else
             echo "See commit history for changes." > /tmp/body.md
           fi

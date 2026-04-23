@@ -67,15 +67,6 @@ npm install && npm run build
 # Load extension/dist/chrome-mv3/ in chrome://extensions/
 ```
 
-Or use Docker for the backend:
-
-```bash
-docker run -d -p 3456:3456 \
-  -v /path/to/obsidian/vault:/vault \
-  -e OBSIDIAN_VAULT_PATH=/vault \
-  ghcr.io/pdajoy/mindshelf/backend:latest
-```
-
 For development:
 
 ```bash
@@ -202,11 +193,9 @@ The backend exposes a minimal API surface:
 
 ## CI/CD
 
-GitHub Actions builds on every push to `main`:
-- **Chrome Extension** — built & packaged as downloadable zip artifact
-- **Backend Docker Image** — multi-stage build (`tsc` → `node:22-alpine`), pushed to GHCR
+GitHub Actions builds and packages the Chrome extension on every push to `main`.
 
-Tag `v*` to create a GitHub Release with the extension zip attached.
+Tag `v*` to validate the backend build and create a GitHub Release with the extension zip attached.
 
 ## License
 
