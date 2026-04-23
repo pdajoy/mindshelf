@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "MindShelf",
+    "description": "Extension name shown in Chrome"
+  },
+  "extDescription": {
+    "message": "Personal Knowledge Asset Library — AI-powered tab management and knowledge export",
+    "description": "Extension description shown in manifest and Chrome Web Store"
+  },
+  "actionTitle": {
+    "message": "MindShelf",
+    "description": "Toolbar action title"
+  }
+}

@@ -13,8 +13,9 @@ export default defineConfig({
     '@': path.resolve('src'),
   },
   manifest: {
-    name: 'MindShelf',
-    description: 'Personal Knowledge Asset Library — AI-powered tab management and knowledge export',
+    default_locale: 'en',
+    name: '__MSG_extName__',
+    description: '__MSG_extDescription__',
     version: pkg.version,
     permissions: [
       'tabs',
@@ -36,7 +37,7 @@ export default defineConfig({
     },
     action: {
       default_popup: 'popup.html',
-      default_title: 'MindShelf',
+      default_title: '__MSG_actionTitle__',
     },
   },
   vite: () => ({

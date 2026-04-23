@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "MindShelf",
+    "description": "Chrome 中显示的扩展名称"
+  },
+  "extDescription": {
+    "message": "个人知识资产库：AI 驱动的标签页管理与知识导出工具",
+    "description": "manifest 和 Chrome 商店中显示的扩展描述"
+  },
+  "actionTitle": {
+    "message": "MindShelf",
+    "description": "工具栏按钮标题"
+  }
+}
