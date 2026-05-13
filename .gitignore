@@ -42,3 +42,5 @@ RESEARCH-*.md
 
 # Reports
 reports/
+extension/test-results/
+extension/playwright-report/

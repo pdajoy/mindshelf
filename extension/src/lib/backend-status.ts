@@ -5,14 +5,16 @@ export async function checkBackendAvailable(backendUrl: string): Promise<boolean
   if (_checkPromise) return _checkPromise;
 
   _checkPromise = (async () => {
+    let timeout: ReturnType<typeof setTimeout> | null = null;
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
+      timeout = setTimeout(() => controller.abort(), 3000);
       const res = await fetch(`${backendUrl}/api/health`, { signal: controller.signal });
-      clearTimeout(timeout);
       _backendAvailable = res.ok;
     } catch {
       _backendAvailable = false;
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
     _checkPromise = null;
     return _backendAvailable;

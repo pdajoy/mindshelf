@@ -61,8 +61,8 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
 
   return (
     <div className="border-b border-border shrink-0">
-      <div className="flex items-center px-2 py-1 gap-1 min-w-0">
-        <div className="flex items-center gap-0.5 shrink-0">
+      <div className="flex items-center px-2 py-1 gap-1 min-w-0 overflow-hidden">
+        <div className="flex items-center gap-0.5 min-w-0 overflow-hidden">
           {([
             { key: 'tabs' as Panel, label: t('header.tabs'), badge: tabs.length, icon: '📑', tip: t('header.tabsTip') },
             { key: 'chat' as Panel, label: 'AI Agent', badge: null, icon: '🤖', tip: t('header.chatTip') },
@@ -72,12 +72,13 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
               onClick={() => setActivePanel(key)}
               title={tip}
               className={cn(
-                'px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors',
+                'flex items-center gap-1 min-w-0 px-2 py-1.5 text-xs font-medium rounded-md transition-colors',
                 activePanel === key ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
               )}
             >
-              {icon} {label}
-              {badge != null && <span className="ml-0.5 text-[10px] opacity-50 font-normal">{badge}</span>}
+              <span className="shrink-0">{icon}</span>
+              <span className="mindshelf-panel-label truncate">{label}</span>
+              {badge != null && <span className="text-[10px] opacity-50 font-normal shrink-0">{badge}</span>}
             </button>
           ))}
         </div>
@@ -96,7 +97,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
                 )}
               >
                 <Sparkles className="h-3 w-3 shrink-0" />
-                {isClassifying ? t('header.stop') : t('header.classify')}
+                <span className="mindshelf-action-label">{isClassifying ? t('header.stop') : t('header.classify')}</span>
               </button>
 
               <button
@@ -111,7 +112,7 @@ export function Header({ viewMode, onViewModeChange }: HeaderProps) {
                 title={t('header.dedupTip')}
               >
                 {detectingDups ? <Loader2 className="h-3 w-3 animate-spin" /> : <Copy className="h-3 w-3 shrink-0" />}
-                {duplicateGroups.length > 0 ? `${duplicateGroups.length}` : t('header.dedup')}
+                {duplicateGroups.length > 0 ? `${duplicateGroups.length}` : <span className="mindshelf-action-label">{t('header.dedup')}</span>}
               </button>
 
               <button

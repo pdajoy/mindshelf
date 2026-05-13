@@ -24,10 +24,15 @@ function ProviderCard({ provider, isActive, onActivate }: { provider: ModelProvi
   const typeInfo = PROVIDER_TYPES.find(p => p.value === provider.type) || PROVIDER_TYPES[0];
 
   const addModel = () => {
-    if (!newModel.trim()) return;
-    const models = [...provider.models, newModel.trim()];
+    const model = newModel.trim();
+    if (!model) return;
+    if (provider.models.includes(model)) {
+      if (isActive && !s.activeModel) s.setActiveModel(model);
+      setNewModel('');
+      return;
+    }
+    const models = [...provider.models, model];
     s.updateProvider(provider.id, { models });
-    if (isActive && !s.activeModel) s.setActiveModel(newModel.trim());
     setNewModel('');
   };
 
@@ -163,7 +168,7 @@ export function SettingsOverlay() {
   return createPortal(
     <div className="fixed inset-0 z-[9998] flex" style={{ isolation: 'isolate' }}>
       <div className="absolute inset-0 bg-black/30" onClick={toggleSettings} />
-      <div className="relative ml-auto w-full max-w-[360px] bg-background border-l border-border overflow-auto animate-in slide-in-from-right">
+      <div className="relative ml-auto w-full max-w-[420px] bg-background border-l border-border overflow-auto animate-in slide-in-from-right">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border sticky top-0 bg-background z-10">
           <h2 className="text-sm font-semibold">{t('settings.title')}</h2>
           <button onClick={toggleSettings} className="p-1 rounded hover:bg-muted"><X className="h-4 w-4" /></button>

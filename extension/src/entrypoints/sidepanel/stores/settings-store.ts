@@ -66,6 +66,9 @@ const DEFAULT_QUICK_PROMPTS: QuickPrompt[] = [
   { name: '技术笔记', prompt: '整理为技术笔记格式，突出代码和实现细节' },
 ];
 
+let persistQueue: Promise<void> = Promise.resolve();
+let pendingPersist: Record<string, unknown> = {};
+
 const SYNC_KEYS = [
   'providers', 'activeProviderId', 'activeModel',
   'maxAgentSteps', 'language', 'backendUrl', 'theme',
@@ -106,9 +109,14 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   },
 
   updateProvider: (id, updates) => {
-    const providers = get().providers.map(p => p.id === id ? { ...p, ...updates } : p);
-    set({ providers });
-    persist({ providers });
+    const state = get();
+    const providers = state.providers.map(p => p.id === id ? { ...p, ...updates } : p);
+    const next: Record<string, unknown> = { providers };
+    if (state.activeProviderId === id && updates.models && !updates.models.includes(state.activeModel)) {
+      next.activeModel = updates.models[0] || '';
+    }
+    set(next as any);
+    persist(next);
   },
 
   removeProvider: (id) => {
@@ -186,6 +194,19 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           s.activeModel = s.aiModel || 'gpt-4o-mini';
           persist({ providers: s.providers, activeProviderId: s.activeProviderId, activeModel: s.activeModel });
         }
+        if (Array.isArray(s.providers) && s.providers.length) {
+          const activeProvider = s.providers.find((p: ModelProvider) => p.id === s.activeProviderId) || s.providers[0];
+          const normalized: Record<string, unknown> = {};
+          if (s.activeProviderId !== activeProvider.id) {
+            s.activeProviderId = activeProvider.id;
+            normalized.activeProviderId = activeProvider.id;
+          }
+          if (!s.activeModel || !activeProvider.models?.includes(s.activeModel)) {
+            s.activeModel = activeProvider.models?.[0] || '';
+            normalized.activeModel = s.activeModel;
+          }
+          if (Object.keys(normalized).length) persist(normalized);
+        }
         const u: Record<string, unknown> = {};
         for (const k of SYNC_KEYS) if (s[k] !== undefined) u[k] = s[k];
         if (Object.keys(u).length) set(u as any);
@@ -213,9 +234,16 @@ if (typeof window !== 'undefined') {
 }
 
 function persist(partial: Record<string, unknown>) {
-  chrome.storage.local.get(SETTINGS_STORAGE_KEY).then(r => {
-    chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: { ...(r[SETTINGS_STORAGE_KEY] || {}), ...partial } });
-  }).catch(() => {});
+  pendingPersist = { ...pendingPersist, ...partial };
+  persistQueue = persistQueue.then(async () => {
+    const updates = pendingPersist;
+    pendingPersist = {};
+    if (!Object.keys(updates).length) return;
+    try {
+      const r = await chrome.storage.local.get(SETTINGS_STORAGE_KEY);
+      await chrome.storage.local.set({ [SETTINGS_STORAGE_KEY]: { ...(r[SETTINGS_STORAGE_KEY] || {}), ...updates } });
+    } catch {}
+  });
 }
 
 if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {

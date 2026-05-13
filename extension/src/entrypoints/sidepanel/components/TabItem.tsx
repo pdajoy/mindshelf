@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { cn, formatDomain, truncate, timeAgo } from '@/lib/utils';
+import { cn, formatDomain, timeAgo } from '@/lib/utils';
 import type { TabRecord } from '@/lib/types';
 import { useTabStore } from '../stores/tab-store';
 import { useNavStore } from '../stores/nav-store';
@@ -55,7 +55,7 @@ export function TabItem({ tab }: TabItemProps) {
     <div
       data-tab-id={tab.id}
       className={cn(
-        'group flex items-start gap-2 px-2.5 py-2 border-b border-border/50 hover:bg-muted/50 transition-colors',
+        'group relative flex items-start gap-2 px-2.5 py-2 border-b border-border/50 hover:bg-muted/50 transition-colors',
         isSelected && 'bg-primary/5',
       )}
     >
@@ -81,7 +81,7 @@ export function TabItem({ tab }: TabItemProps) {
           onClick={handleActivate}
           title={tab.title}
         >
-          {truncate(tab.title, 60)}
+          {tab.title}
         </div>
 
         <div className="flex items-center gap-1 mt-0.5 text-xs text-muted-foreground flex-wrap">
@@ -121,7 +121,7 @@ export function TabItem({ tab }: TabItemProps) {
         )}
       </div>
 
-      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="absolute right-2 top-2 flex gap-0.5 rounded-md bg-background/90 opacity-0 shadow-sm ring-1 ring-border/50 backdrop-blur-sm transition-opacity group-hover:opacity-100">
         <button
           onClick={() => requestSummarize(tab.id)}
           className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground"

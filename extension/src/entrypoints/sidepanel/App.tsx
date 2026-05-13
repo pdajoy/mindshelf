@@ -124,7 +124,7 @@ export function App() {
   }, [tabs]);
 
   // Auto-refresh on Chrome tab events
-  const refreshTimer = useRef<ReturnType<typeof setTimeout>>();
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const doResync = useCallback(async () => {
     const allTabs = await chrome.tabs.query({});
     const syncedTabs: SyncedTab[] = allTabs
@@ -139,7 +139,7 @@ export function App() {
 
   useEffect(() => {
     const debouncedResync = () => {
-      clearTimeout(refreshTimer.current);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
       refreshTimer.current = setTimeout(doResync, 800);
     };
     const handler = (msg: any) => {
@@ -150,7 +150,7 @@ export function App() {
     chrome.runtime.onMessage.addListener(handler);
     return () => {
       chrome.runtime.onMessage.removeListener(handler);
-      clearTimeout(refreshTimer.current);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
     };
   }, [doResync]);
 

@@ -10,41 +10,61 @@ const WS_URL = 'ws://localhost:3456/ws/bridge';
 const RECONNECT_BASE_MS = 5000;
 const RECONNECT_MAX_MS = 60000;
 const KEEPALIVE_ALARM = 'ws-keepalive';
+const KEEPALIVE_PERIOD_MINUTES = 1;
 
 let ws: WebSocket | null = null;
 let reconnectDelay = RECONNECT_BASE_MS;
 let intentionalClose = false;
 let backendReachable = false;
+let started = false;
+let connecting = false;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let keepaliveReady = false;
 
 export function startBridgeClient() {
+  if (started) return;
+  started = true;
   tryConnect();
   setupKeepalive();
 }
 
 async function checkBackendHealth(): Promise<boolean> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    timeout = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(`${BACKEND_URL}/api/health`, { signal: controller.signal });
-    clearTimeout(timeout);
     if (!res.ok) return false;
     const data = await res.json();
     return data?.name === 'MindShelf Backend';
   } catch {
     return false;
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 
 async function tryConnect() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+  if (connecting) return;
 
-  backendReachable = await checkBackendHealth();
-  if (!backendReachable) {
-    scheduleReconnect();
-    return;
+  connecting = true;
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
   }
 
-  connect();
+  try {
+    backendReachable = await checkBackendHealth();
+    if (!backendReachable) {
+      scheduleReconnect();
+      return;
+    }
+
+    connect();
+  } finally {
+    connecting = false;
+  }
 }
 
 function connect() {
@@ -84,13 +104,19 @@ function connect() {
 }
 
 function scheduleReconnect() {
+  if (reconnectTimer) return;
   const jitter = Math.random() * 1000;
-  setTimeout(tryConnect, reconnectDelay + jitter);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    tryConnect();
+  }, reconnectDelay + jitter);
   reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS);
 }
 
 function setupKeepalive() {
-  chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: 0.4 });
+  if (keepaliveReady) return;
+  keepaliveReady = true;
+  chrome.alarms.create(KEEPALIVE_ALARM, { periodInMinutes: KEEPALIVE_PERIOD_MINUTES });
   chrome.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name !== KEEPALIVE_ALARM) return;
     if (!ws || ws.readyState !== WebSocket.OPEN) tryConnect();

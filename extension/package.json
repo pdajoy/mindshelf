@@ -1,6 +1,6 @@
 {
   "name": "mindshelf-extension",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -8,6 +8,9 @@
     "dev:firefox": "wxt --browser firefox",
     "build": "wxt build",
     "build:firefox": "wxt build --browser firefox",
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:ui": "npm run build && playwright test --ui",
+    "playwright:install": "playwright install chromium",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip --browser firefox",
     "postinstall": "wxt prepare"
@@ -39,6 +42,7 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@types/turndown": "^5.0.6",
